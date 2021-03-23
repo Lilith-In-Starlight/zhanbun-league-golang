@@ -38,15 +38,21 @@ func main(){
   _, err = db.Exec(`CREATE TABLE players(
     uuid TEXT PRIMARY KEY,
     name TEXT,
-    batting TEXT,
-    pitching TEXT,
-    defense TEXT,
-    blaserunning TEXT,
+    team TEXT,
+    batting FLOAT8,
+    pitching FLOAT8,
+    defense FLOAT8,
+    blaserunning FLOAT8,
     modifiers TEXT,
-    
+    blood TEXT,
+    rh TEXT,
+    drink TEXT,
+    food TEXT,
+    ritual TEXT
     )`)
   for k := range team_file {
-    fmt.Println(k)
+    exec := "INSERT INTO players values ($1, $2, $3, %4, %5, %6, %7, %8, %9, %10, %11, %12)"
+    db.Exec(exec, k["uuid"], k["name"], k["team"], k["batting"], k["pitching"], k["defense"], k["blaserunning"], k["modifiers"], k["blood"], k["rh"], k["drink"], k["food"], k["ritual"])
 
   discord.AddHandler(messageCreate)
   discord.Identify.Intents = discordgo.IntentsGuildMessages
