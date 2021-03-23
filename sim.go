@@ -41,6 +41,11 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
   if m.ChannelID == "823421429601140756" {
-    fmt.Println("Test")
+    switch m.content {
+    case "&help":
+      s.ChannelMessageSend(m.ChannelID, `**How to use the Zhanbun League Blasebot**
+        **$help:** Sends this message.
+        **$st:** Shows all teams.`)
+    }
   }
 }
