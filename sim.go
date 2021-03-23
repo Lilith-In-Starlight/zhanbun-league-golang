@@ -30,6 +30,7 @@ func main(){
 	<-sc
 
 	// Cleanly close down the Discord session.
+	fmt.Println("Closing bot.")
 	discord.Close()
 }
 
