@@ -1,27 +1,57 @@
 package main
 
 import (
+  "log"
   "fmt"
   "os"
 	"os/signal"
 	"syscall"
+  "io/ioutil"
+  "encoding/json"
+  "database/sql"
 
+  _ "github.com/lib/pq"
   "github.com/bwmarrin/discordgo"
+  "github.com/joho/godotenv"
+  //"github.com/google/uuid"
 )
 
+var attacking_league [10]string
+var defending_league [10]string
+
 func main(){
-  fmt.Println("Initiated program")
-  discord, err := discordgo.New("Bot " + "ODIzOTgyNDg3MjcyMjkyMzcy.YFovfQ.JTEBZS8UlwXHeY9gDEiJJmgm3Ks")
-  if err != nil {
-    fmt.Println("Error creating Discord session: ", err)
-    return
-  }
+  envs, err := godotenv.Read(".env")
+  CheckError(err)
+
+  discord, err := discordgo.New("Bot " + envs["BOT_KEY"])
+  CheckError(err)
+
+  team_file_json, err := ioutil.ReadFile("teams.txt")
+  CheckError(err)
+
+  var team_file map[string]interface{}
+  json.Unmarshal([]byte(team_file_json), &team_file)
+
+  db, err := sql.Open("postgres", envs["DATABASE_URL"])
+  CheckError(err)
+
+  _, err = db.Exec(`CREATE TABLE players(
+    uuid TEXT PRIMARY KEY,
+    name TEXT,
+    batting TEXT,
+    pitching TEXT,
+    defense TEXT,
+    blaserunning TEXT,
+    modifiers TEXT,
+    
+    )`)
+  for k := range team_file {
+    fmt.Println(k)
+
   discord.AddHandler(messageCreate)
   discord.Identify.Intents = discordgo.IntentsGuildMessages
   err = discord.Open()
-  if err != nil {
-    fmt.Println("Error opening Discord session: ", err)
-  }
+  CheckError(err)
 
   // Wait here until CTRL-C or other term signal is received.
 	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
@@ -31,6 +61,7 @@ func main(){
 
 	// Cleanly close down the Discord session.
 	fmt.Println("Closing bot.")
+  db.Close()
 	discord.Close()
 }
 
@@ -41,11 +72,19 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
   if m.ChannelID == "823421429601140756" {
-    switch m.content {
+    switch m.Content {
     case "&help":
       s.ChannelMessageSend(m.ChannelID, `**How to use the Zhanbun League Blasebot**
         **$help:** Sends this message.
         **$st:** Shows all teams.`)
+    case "&st":
+      // var content string = ""
     }
+  }
+}
+
+func CheckError(err error) {
+  if err != nil {
+    log.Fatal(err)
   }
 }
