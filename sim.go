@@ -3,17 +3,17 @@ package main
 import (
     "log"
     "fmt"
+    "strings"
     "os"
     "os/signal"
     "syscall"
     "io/ioutil"
-    "encoding/json"
     "database/sql"
 
     _ "github.com/lib/pq"
     "github.com/bwmarrin/discordgo"
     "github.com/joho/godotenv"
-    //"github.com/google/uuid"
+    _ "github.com/google/uuid"
 )
 
 var attacking_league [10]string
@@ -27,10 +27,10 @@ type Player struct {
     UUID string
     Name string
     Team string
-    Batting float
-    Pitching float
-    Defense float
-    Modifiers map
+    Batting float32
+    Pitching float32
+    Defense float32
+    Modifiers map[string]int
     Blood string
     Rh string
 }
@@ -38,12 +38,12 @@ type Team struct {
     UUID string
     Name string
     Description string
-    Icon float
-    Lineup float
-    Rotation float
-    Modifiers map
-    AvgDef string
-    CurrentPitcher string
+    Icon string
+    Lineup []string
+    Rotation []string
+    Modifiers map[string]int
+    AvgDef float32
+    CurrentPitcher int
 }
 type Game struct {
     Home string
@@ -58,6 +58,17 @@ type Game struct {
     Bases [3]string
 }
 
+/*func NewPlayer() {
+    player := new(Player)
+}*/
+
+func NewTeam(name string, description string, icon string) {
+    team := new(Team)
+    team.Name = name
+    team.Description = description
+    team.Icon = icon
+}
+
 func main(){
     // Load the .env file, this has to be discarded for heroku releases
     envs, err := godotenv.Read(".env")
@@ -66,13 +77,6 @@ func main(){
     // Set up the bot using the bot key that's found in the environment variable
     discord, err := discordgo.New("Bot " + envs["BOT_KEY"])
     CheckError(err)
-
-
-    players_file_json, err := ioutil.ReadFile("players.txt")
-    CheckError(err)
-
-    var players_file map[string]interface{}
-    json.Unmarshal([]byte(players_file_json), &players_file)
 
     db, err := sql.Open("postgres", envs["DATABASE_URL"])
     CheckError(err)
@@ -137,7 +141,6 @@ func main(){
     _, err = db.Exec(`CREATE TABLE IF NOT EXISTS ritual_pool(
         ritual TEXT UNIQUE
     )`)
-
 
     // Add handler for when people send messages and open the bot
     discord.AddHandler(messageCreate)
