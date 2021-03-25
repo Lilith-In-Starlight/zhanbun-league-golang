@@ -134,6 +134,8 @@ func NewTeam(name string, description string, icon string) string {
     team.Lineup = GeneratePlayers(team.UUID, 10)
     team.Rotation = GeneratePlayers(team.UUID, 2)
     team.Modifiers = make(map[string]int)
+
+    // Players have a 20% chance of being ghosts
     if rand.Float32() < 0.2 {
         team.Modifiers["intangible"] = -1
     }
