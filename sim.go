@@ -505,6 +505,7 @@ func Handle(game *Game, index int) {
                             announcements = append(announcements, batter.Name + " hits a single!")
                         } else if happen < batter.Batting * 0.999 {
                             announcements = append(announcements, batter.Name + " hits a flyout!")
+                            game.Outs += 1
                         } else {
                             announcements = append(announcements, batter.Name + " hits the ball so hard it goes to another game!")
                         }
@@ -513,16 +514,24 @@ func Handle(game *Game, index int) {
                             announcements = append(announcements, "Ball.")
                         } else if happen < batter.Batting + pitcher.Pitching * 0.25 {
                             announcements = append(announcements, "Strike, swinging.")
+                            game.Strikes += 1
                         } else if happen < batter.Batting + pitcher.Pitching * 0.65 {
                             announcements = append(announcements, "Strike, looking.")
+                            game.Strikes += 1
                         } else if happen < batter.Batting + pitcher.Pitching * 0.99999 {
                             announcements = append(announcements, "Strike, flinching.")
+                            game.Strikes += 1
                         } else {
                             announcements = append(announcements, "Strike, knows too much.")
+                            game.Strikes += 1
                         }
                     }
                     if game.Outs >= 3 {
                         InningState = "starting"
+                        if !game.Top {
+                            game.Inning += 1
+                        }
+                        game.Top = !game.Top
                     }
                 }
 
