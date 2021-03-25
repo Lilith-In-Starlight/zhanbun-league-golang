@@ -526,12 +526,19 @@ func Handle(game *Game, index int) {
                             game.Strikes += 1
                         }
                     }
+
+                    if game.Strikes >= 3 {
+                        game.Strikes = 0
+                        game.Balls = 0
+                        game.Outs += 1
+                        announcements = append(announcements, batter.Name + " strikes out.")
+                    }
                     if game.Outs >= 3 {
-                        InningState = "starting"
                         if !game.Top {
                             game.Inning += 1
                         }
                         game.Top = !game.Top
+                        InningState = "starting"
                     }
                 }
 
