@@ -64,6 +64,7 @@ type Game struct {
 }
 
 const CommandChannelId = "823421429601140756"
+const GamesChannelId = "823421360768417824"
 
 var attacking_league [10]string
 var defending_league [10]string
@@ -183,7 +184,7 @@ func NewGame(home string, away string, innings int) {
     game.Away = away
     game.BatterHome, game.BatterAway = 0, 0
     game.Weather = "rain"
-    game.Inning = 0
+    game.Inning = 1
     game.MaxInnings = innings
     game.Top = true
     game.RunsAway, game.RunsHome = 0, 0
@@ -406,7 +407,9 @@ func main(){
     err = discord.Open()
     CheckError(err)
 
-    go HandleGames()
+
+
+    go HandleGames(discord)
     time.Sleep(0)
 
     // Wait here until CTRL-C or other term signal is received.
@@ -421,12 +424,18 @@ func main(){
     discord.Close()
 }
 
-func HandleGames() {
+func HandleGames(session *discordgo.Session) {
     for true {
         if len(upcoming) > 0 && len(games) == 0 {
             for k := range upcoming {
+                embd := new(discordgo.MessageEmbed)
+                embd.Title = "Preparing Game"
+                embd.Color = 8651301
+                AddField(embd, "Please Wait", "...", true)
+                msg, _ := session.ChannelMessageSendEmbed(GamesChannelId, embd)
+                upcoming[k].MessageId = msg.ID
                 games = append(games, upcoming[k])
-                go Handle(&games[len(games)-1], k)
+                go Handle(&games[len(games)-1], k, session)
 
             }
             upcoming = make([]Game, 0)
@@ -440,7 +449,7 @@ func HandleGames() {
                 } else {
                     TeamB = string(k)
                     NewGame(TeamA, TeamB, 9)
-                    fmt.Println(players[teams[TeamA].Lineup[0]])
+                    break
                 }
                 i += 1
             }
@@ -450,12 +459,17 @@ func HandleGames() {
     }
 }
 
-func Handle(game *Game, index int) {
+func Handle(game *Game, index int, session *discordgo.Session) {
     InningState := "starting" // starting, inning, outing
     /* When a half-inning inning starts, the innning's state is starting
     When a half-inning is ongoing, the inning's state is inning
     When the whole inning ends, the inning's state is outing*/
     var announcements []string
+    changeBatter := true
+    var batting_team Team
+    var pitching_team Team
+    var batter Player
+    var pitcher Player
     Loop:
     for true {
         /* Nothing can go on until the announcements are finished
@@ -467,10 +481,10 @@ func Handle(game *Game, index int) {
             case "inning", "starting":
                 // If it's the top of the inning, the batter is the home team
                 // And the pitcher is the away team
-                batting_team := teams[game.Home]
-                pitching_team := teams[game.Away]
-                batter := players[batting_team.Lineup[game.BatterHome]]
-                pitcher := players[pitching_team.Rotation[pitching_team.CurrentPitcher]]
+                batting_team = teams[game.Home]
+                pitching_team = teams[game.Away]
+                batter = players[batting_team.Lineup[game.BatterHome]]
+                pitcher = players[pitching_team.Rotation[pitching_team.CurrentPitcher]]
                 if !game.Top {
                     batting_team = teams[game.Away]
                     pitching_team = teams[game.Home]
@@ -489,26 +503,69 @@ func Handle(game *Game, index int) {
                     game.Outs = 0
                     game.Strikes = 0
                     game.Balls = 0
+
                     InningState = "inning"
-                } else {
-                    probability := batter.Batting + pitcher.Pitching
-                    happen := rand.Float32() * probability
-                    fmt.Println(batter.Batting)
+                }
+
+                // If in the last tick it was determined that the batter should change
+                if changeBatter {
+                    game.Strikes = 0
+                    game.Balls = 0
+                    if !game.Top {
+                        game.BatterAway = (game.BatterAway + 1) % len(batting_team.Lineup)
+                        batter = players[batting_team.Lineup[game.BatterAway]]
+                    } else {
+                        game.BatterHome = (game.BatterHome + 1) % len(batting_team.Lineup)
+                        batter = players[batting_team.Lineup[game.BatterHome]]
+                    }
+                    announcements = append(announcements, batter.Name + " batting for the " + batting_team.Name)
+                    changeBatter = false
+                }
+
+                if InningState == "inning" {
+                    probability := batter.Batting + pitcher.Pitching //The range of probabilities
+                    happen := rand.Float32() * probability // What actually happens
+                    // The batter manages to bat
                     if happen < batter.Batting {
-                        if happen < batter.Batting * 0.01 {
+                        var runsScored int
+                        if happen < batter.Batting * 0.01 { // Homer
                             announcements = append(announcements, batter.Name + " hits a solo home run!")
-                        } else if happen < batter.Batting * 0.025 {
+                            runsScored = Advance(&game.Bases, batter.UUID, 4)
+                            game.Strikes = 0
+                            game.Balls = 0
+                        } else if happen < batter.Batting * 0.025 { // Triple
                             announcements = append(announcements, batter.Name + " hits a triple!")
-                        } else if happen < batter.Batting * 0.1 {
+                            runsScored = Advance(&game.Bases, batter.UUID, 3)
+                            game.Strikes = 0
+                            game.Balls = 0
+                        } else if happen < batter.Batting * 0.1 { // Twin
                             announcements = append(announcements, batter.Name + " hits a double!")
-                        } else if happen < batter.Batting * 0.35 {
+                            runsScored = Advance(&game.Bases, batter.UUID, 2)
+                            game.Strikes = 0
+                            game.Balls = 0
+                        } else if happen < batter.Batting * 0.35 { // Singlet
                             announcements = append(announcements, batter.Name + " hits a single!")
+                            runsScored = Advance(&game.Bases, batter.UUID, 1)
+                            game.Strikes = 0
+                            game.Balls = 0
+
                         } else if happen < batter.Batting * 0.999 {
                             announcements = append(announcements, batter.Name + " hits a flyout!")
                             game.Outs += 1
+                            changeBatter = true
                         } else {
                             announcements = append(announcements, batter.Name + " hits the ball so hard it goes to another game!")
                         }
+                        if runsScored != 0 {
+                            if runsScored == 1 {
+                                announcements = append(announcements, strconv.Itoa(runsScored) + " run scored.")
+                            } else {
+                                announcements = append(announcements, strconv.Itoa(runsScored) + " runs scored.")
+                            }
+                        }
+                        changeBatter = true
+
+                    // The batter fails to bat
                     } else {
                         if happen < batter.Batting + pitcher.Pitching * 0.1 {
                             announcements = append(announcements, "Ball.")
@@ -532,30 +589,92 @@ func Handle(game *Game, index int) {
                         game.Balls = 0
                         game.Outs += 1
                         announcements = append(announcements, batter.Name + " strikes out.")
+                        changeBatter = true
                     }
                     if game.Outs >= 3 {
                         if !game.Top {
                             game.Inning += 1
+                            // Game is Over
+                            if game.RunsAway != game.RunsHome && game.Inning >= 9 {
+                                games = append(games[:index], games[index+1:]...)
+                                fmt.Println("Finished")
+                                break Loop
+                            }
+                            announcements = append(announcements, "Inning " + strconv.Itoa(game.Inning-1) + " is now an outing.")
                         }
                         game.Top = !game.Top
                         InningState = "starting"
+                        changeBatter = true
                     }
                 }
-
-            case "outing": // It's called an outing because it has no ins (is full of outs)
-                if game.RunsAway != game.RunsHome && game.Inning >= 9 {
-                    games = append(games[:index], games[index+1:]...)
-                    fmt.Println("Finished")
-                    break Loop
-                }
-                announcements = append(announcements, "Inning " + strconv.Itoa(game.Inning) + "is now an outing.")
             }
         } else {
             fmt.Println(announcements[0])
+
+            emb := new(discordgo.MessageEmbed)
+            foot := new(discordgo.MessageEmbedFooter)
+            foot.Text = "React with any of the emotes shown to get more information about them."
+            if game.Top {
+                emb.Title = "🔺"
+            } else {
+                emb.Title = "🔻"
+            }
+            emb.Title += strconv.Itoa(game.Inning)
+            emb.Color = 8651301
+            emb.Footer = foot
+            AddField(emb, teams[game.Home].Icon + teams[game.Home].Name, strconv.Itoa(game.RunsHome), false)
+            AddField(emb, teams[game.Away].Icon + teams[game.Away].Name, strconv.Itoa(game.RunsAway), true)
+            AddField(emb, "🏏 Batting", batter.Name, false)
+            AddField(emb, "⚾ Pitching", pitcher.Name, true)
+            AddField(emb, "Outs", strconv.Itoa(game.Outs), false)
+            AddField(emb, "Strikes", strconv.Itoa(game.Strikes), true)
+            AddField(emb, "Balls", strconv.Itoa(game.Balls), true)
+            if game.Bases[0] != "" {
+                AddField(emb, "1️⃣", players[game.Bases[0]].Name, false)
+            } else {
+                AddField(emb, "1️⃣", "Empty", false)
+            }
+            if game.Bases[1] != "" {
+                AddField(emb, "2️⃣", players[game.Bases[1]].Name, true)
+            } else {
+                AddField(emb, "2️⃣", "Empty", true)
+            }
+            if game.Bases[2] != "" {
+                AddField(emb, "3️⃣", players[game.Bases[2]].Name, true)
+            } else {
+                AddField(emb, "3️⃣", "Empty", true)
+            }
+            AddField(emb, "Events", announcements[0], false)
+            _, err := session.ChannelMessageEditEmbed(GamesChannelId, game.MessageId, emb)
+            CheckError(err)
             announcements = append(announcements[:0], announcements[1:]...)
+
         }
         time.Sleep(1 * time.Second)
     }
+}
+
+func Advance(bases *[3]string, homeBase string, times int) int{
+    runsScored := 0
+    for k := 0; k < times; k++ {
+        for i := 2; i >= 0; i-- {
+            if i > 0 {
+                if bases[i-1] != "" {
+                    if i != 2 {
+                        bases[i+1] = bases[i]
+                    } else {
+                        runsScored += 1
+                        bases[i] = ""
+                    }
+                    bases[i] = bases[i-1]
+                    bases[i-1] = ""
+                }
+            } else {
+                bases[i] = homeBase
+            }
+        }
+    }
+    return runsScored
 }
 
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
@@ -574,6 +693,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
             AddField(emb, "&st", "Shows a list of all teams.", false)
             /*emb.AddField("&help", "Sends this list of commands.")
             emb.AddField("&st", "Shows a list of all teams.")*/
+            fmt.Println(emb)
             s.ChannelMessageSendEmbed(m.ChannelID, emb)
             /*s.ChannelMessageSend(m.ChannelID, `**How to use the Zhanbun League Blasebot**
                 **$help:** Sends this message.
@@ -643,7 +763,6 @@ func StringSlice(str string) []string {
         split := strings.Split(str, ";;")
         for k := range split {
             ret = append(ret, split[k])
-            fmt.Println(ret)
         }
     }
     return ret
