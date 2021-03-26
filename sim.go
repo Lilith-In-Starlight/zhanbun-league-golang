@@ -622,29 +622,34 @@ func Handle(game *Game, index int, session *discordgo.Session) {
             emb.Title += strconv.Itoa(game.Inning)
             emb.Color = 8651301
             emb.Footer = foot
-            AddField(emb, teams[game.Home].Icon + teams[game.Home].Name, strconv.Itoa(game.RunsHome), false)
+            AddField(emb, teams[game.Home].Icon + teams[game.Home].Name, strconv.Itoa(game.RunsHome), true)
             AddField(emb, teams[game.Away].Icon + teams[game.Away].Name, strconv.Itoa(game.RunsAway), true)
-            AddField(emb, "🏏 Batting", batter.Name, false)
-            AddField(emb, "⚾ Pitching", pitcher.Name, true)
-            AddField(emb, "Outs", strconv.Itoa(game.Outs), false)
+            if game.Top {
+                AddField(emb, "Inning", " 🔺" + strconv.Itoa(game.Inning), true)
+            } else {
+                AddField(emb, "Inning", " 🔻" + strconv.Itoa(game.Inning), true)
+            }
+            AddField(emb, "Outs", strconv.Itoa(game.Outs), true)
             AddField(emb, "Strikes", strconv.Itoa(game.Strikes), true)
             AddField(emb, "Balls", strconv.Itoa(game.Balls), true)
+            AddField(emb, "🏏 Batting", batter.Name, true)
+            AddField(emb, "⚾ Pitching", pitcher.Name, true)
             if game.Bases[0] != "" {
-                AddField(emb, "1️⃣", players[game.Bases[0]].Name, false)
+                AddField(emb, "Base 1️⃣", players[game.Bases[0]].Name, false)
             } else {
-                AddField(emb, "1️⃣", "Empty", false)
+                AddField(emb, "Base 1️⃣", "Empty", false)
             }
             if game.Bases[1] != "" {
-                AddField(emb, "2️⃣", players[game.Bases[1]].Name, true)
+                AddField(emb, "Base 2️⃣", players[game.Bases[1]].Name, true)
             } else {
-                AddField(emb, "2️⃣", "Empty", true)
+                AddField(emb, "Base 2️⃣", "Empty", true)
             }
             if game.Bases[2] != "" {
-                AddField(emb, "3️⃣", players[game.Bases[2]].Name, true)
+                AddField(emb, "Base 3️⃣", players[game.Bases[2]].Name, true)
             } else {
-                AddField(emb, "3️⃣", "Empty", true)
+                AddField(emb, "Base 3️⃣", "Empty", true)
             }
-            AddField(emb, "Events", announcements[0], false)
+            AddField(emb, "🍿", announcements[0], false)
             _, err := session.ChannelMessageEditEmbed(GamesChannelId, game.MessageId, emb)
             CheckError(err)
             announcements = append(announcements[:0], announcements[1:]...)
@@ -662,14 +667,14 @@ func Advance(bases *[3]string, homeBase string, times int) int{
                 if bases[i-1] != "" {
                     if i != 2 {
                         bases[i+1] = bases[i]
-                    } else {
+                    } else if bases[2] != "" {
                         runsScored += 1
                         bases[i] = ""
                     }
                     bases[i] = bases[i-1]
                     bases[i-1] = ""
                 }
-            } else {
+            } else if k == 0 {
                 bases[i] = homeBase
             }
         }
