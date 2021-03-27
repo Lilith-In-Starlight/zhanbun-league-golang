@@ -71,6 +71,8 @@ type Game struct {
     Batter Player
     Pitcher Player
     LastMessage string
+    betsHome []string
+    betsAway []string
 }
 type Fan struct {
     Id string
@@ -91,9 +93,9 @@ var CurrentGamesId3 string
 var cool_league [10]string
 var fun_league [10]string
 
-var players map[string]Player
-var teams map[string]Team
-var fans map[string]Fan
+var players map[string]*Player
+var teams map[string]*Team
+var fans map[string]*Fan
 
 var name_pool []string
 var drink_pool []string
@@ -143,7 +145,7 @@ func NewPlayer(team string) string {
     player.Drink = drink_pool[rand.Intn(len(drink_pool))]
     player.Food = food_pool[rand.Intn(len(food_pool))]
     player.Ritual = ritual_pool[rand.Intn(len(ritual_pool))]
-    players[player.UUID] = *player
+    players[player.UUID] = player
     return player.UUID
 }
 
@@ -167,7 +169,7 @@ func PlayerWithData(team string, uuid string, name string, batting float32, pitc
     player.Drink = drink
     player.Food = food
     player.Ritual = ritual
-    players[player.UUID] = *player
+    players[player.UUID] = player
     return player.UUID
 }
 
@@ -196,7 +198,7 @@ func NewTeam(name string, description string, icon string) string {
     }
     team.AvgDef /= float32(len(team.Lineup))
     team.CurrentPitcher = 0
-    teams[team.UUID] = *team
+    teams[team.UUID] = team
     return team.UUID
 }
 
@@ -212,7 +214,7 @@ func TeamWithData(name string, description string, icon string, uuid string, lin
     team.Modifiers = modifiers
     team.CurrentPitcher = currentPitcher
     team.AvgDef = avgDef
-    teams[team.UUID] = *team
+    teams[team.UUID] = team
     return team.UUID
 }
 
@@ -243,14 +245,14 @@ func NewFan (id string, team string, coins int, votes int, shop map[string]int, 
     fan.Votes = votes
     fan.Shop = shop
     fan.Stan = stan
-    fans[fan.Id] = *fan
+    fans[fan.Id] = fan
     return fan.Id
 }
 
 func main(){
-    players = make(map[string]Player)
-    teams = make(map[string]Team)
-    fans = make(map[string]Fan)
+    players = make(map[string]*Player)
+    teams = make(map[string]*Team)
+    fans = make(map[string]*Fan)
     // Make sure the RNG is random
     rand.Seed(time.Now().Unix())
     // Load the .env file, this has to be discarded for heroku releases
@@ -587,15 +589,15 @@ func HandlePlays (session *discordgo.Session, message string, start int, end int
             case "inning", "starting":
                 // If it's the top of the inning, the batter is the home team
                 // And the pitcher is the away team
-                game.BattingTeam = teams[game.Home]
-                game.PitchingTeam = teams[game.Away]
-                game.Batter = players[game.BattingTeam.Lineup[game.BatterHome]]
-                game.Pitcher = players[game.PitchingTeam.Rotation[game.PitchingTeam.CurrentPitcher]]
+                game.BattingTeam = *teams[game.Home]
+                game.PitchingTeam = *teams[game.Away]
+                game.Batter = *players[game.BattingTeam.Lineup[game.BatterHome]]
+                game.Pitcher = *players[game.PitchingTeam.Rotation[game.PitchingTeam.CurrentPitcher]]
                 if !game.Top {
-                    game.BattingTeam  = teams[game.Away]
-                    game.PitchingTeam = teams[game.Home]
-                    game.Batter = players[game.BattingTeam.Lineup[game.BatterAway]]
-                    game.Pitcher = players[game.PitchingTeam.Rotation[game.PitchingTeam.CurrentPitcher]]
+                    game.BattingTeam  = *teams[game.Away]
+                    game.PitchingTeam = *teams[game.Home]
+                    game.Batter = *players[game.BattingTeam.Lineup[game.BatterAway]]
+                    game.Pitcher = *players[game.PitchingTeam.Rotation[game.PitchingTeam.CurrentPitcher]]
                 }
 
                 if game.InningState == "starting" {
@@ -621,10 +623,10 @@ func HandlePlays (session *discordgo.Session, message string, start int, end int
                     game.Balls = 0
                     if !game.Top {
                         game.BatterAway = (game.BatterAway + 1) % len(game.BattingTeam.Lineup)
-                        game.Batter = players[game.BattingTeam.Lineup[game.BatterAway]]
+                        game.Batter = *players[game.BattingTeam.Lineup[game.BatterAway]]
                     } else {
                         game.BatterHome = (game.BatterHome + 1) % len(game.BattingTeam.Lineup)
-                        game.Batter = players[game.BattingTeam.Lineup[game.BatterHome]]
+                        game.Batter = *players[game.BattingTeam.Lineup[game.BatterHome]]
                     }
                     game.Announcements = append(game.Announcements, game.Batter.Name + " batting for the " + game.BattingTeam.Name)
                     game.AnnouncementStates = append(game.AnnouncementStates, *game)
@@ -769,9 +771,21 @@ func HandlePlays (session *discordgo.Session, message string, start int, end int
             this_output += "**Outs:** " + ShowInCircles(game.AnnouncementStates[0].Outs, 3) + "\n"
             this_output += "**Strikes:** " + ShowInCircles(game.AnnouncementStates[0].Strikes, 3) + "\n"
             this_output += "**Balls:** " + ShowInCircles(game.AnnouncementStates[0].Balls, 4) + "\n\n"
-            this_output += "1️⃣ " + players[game.AnnouncementStates[0].Bases[0]].Name + "\n"
-            this_output += "2️⃣ " + players[game.AnnouncementStates[0].Bases[1]].Name + "\n"
-            this_output += "3️⃣ " + players[game.AnnouncementStates[0].Bases[2]].Name + "\n\n"
+            if game.AnnouncementStates[0].Bases[0] != "" {
+                this_output += "1️⃣ " + players[game.AnnouncementStates[0].Bases[0]].Name + "\n"
+            } else {
+                this_output += "1️⃣ <Empty>" + "\n"
+            }
+            if game.AnnouncementStates[0].Bases[1] != "" {
+                this_output += "2️⃣ " + players[game.AnnouncementStates[0].Bases[1]].Name + "\n"
+            } else {
+                this_output += "2️⃣ <Empty>" + "\n"
+            }
+            if game.AnnouncementStates[0].Bases[2] != "" {
+                this_output += "3️⃣ " + players[game.AnnouncementStates[0].Bases[2]].Name + "\n\n"
+            } else {
+                this_output += "3️⃣ <Empty>" + "\n"
+            }
             this_output += game.Announcements[0] + "\n\n"
             game.LastMessage = this_output
             output += this_output
@@ -867,6 +881,15 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
             }
             AddField(emb, "Upcoming Games", text, false)
             s.ChannelMessageSendEmbed(m.ChannelID, emb)
+        case "&b":
+           emb := new(discordgo.MessageEmbed)
+           CheckForShopItem(m.Author.ID, "snoil", 0)
+           emb.Title = "The Shop" + " (" + strconv.Itoa(fans[m.Author.ID].Coins) + ")"
+           emb.Color = 8651301
+           AddField(emb, "🐍 Snake Oil (" + strconv.Itoa(calculateGrowingPrice(fans[m.Author.ID].Shop["snoil"], 15, 1.8)) + ")", "Increase the maximum amount of money you can bet. It'd go from " + strconv.Itoa(calculateGrowingPrice(fans[m.Author.ID].Shop["snoil"], 10, 1.5)) +" to " + strconv.Itoa(calculateGrowingPrice(fans[m.Author.ID].Shop["snoil"] + 1, 10, 1.5)) + ".", false)
+           AddField(emb, "🎟️ Vote (100)", "Participate in Democracy.", false)
+           AddField(emb, "🥺 Beg (FREE)", "Uses alchemy to convert your brokeness into a few coins.", false)
+           s.ChannelMessageSendEmbed(m.ChannelID, emb)
         default:
             if strings.HasPrefix(m.Content, "&s ") {
                 cont := strings.ToLower(m.Content[3:len(m.Content)])
@@ -886,12 +909,12 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                             emb.Color = 8651301
                             text := ""
                             for k := range team.Lineup {
-                                text += players[team.Lineup[k]].Name + " " + GetModEmojis(players[team.Lineup[k]]) + " " + ShowAsStars(players[team.Lineup[k]].Batting) + "\n"
+                                text += players[team.Lineup[k]].Name + " " + GetModEmojis(*players[team.Lineup[k]]) + " " + ShowAsStars(players[team.Lineup[k]].Batting) + "\n"
                             }
                             AddField(emb, "Lineup", text, false)
                             text = ""
                             for k := range team.Rotation {
-                                text += players[team.Rotation[k]].Name + " " + GetModEmojis(players[team.Rotation[k]])  + " " + ShowAsStars(players[team.Rotation[k]].Pitching) + "\n"
+                                text += players[team.Rotation[k]].Name + " " + GetModEmojis(*players[team.Rotation[k]])  + " " + ShowAsStars(players[team.Rotation[k]].Pitching) + "\n"
                             }
                             AddField(emb, "Rotation", text, false)
                             s.ChannelMessageSendEmbed(m.ChannelID, emb)
@@ -904,12 +927,12 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                             var player Player
                             for k := range team.Lineup {
                                 if strings.ToLower(players[team.Lineup[k]].Name) == strings.ToLower(split[1]) {
-                                    player = players[team.Lineup[k]]
+                                    player = *players[team.Lineup[k]]
                                 }
                             }
                             for k := range team.Rotation {
                                 if strings.ToLower(players[team.Rotation[k]].Name) == strings.ToLower(split[1]) {
-                                    player = players[team.Rotation[k]]
+                                    player = *players[team.Rotation[k]]
                                 }
                             }
 
@@ -946,6 +969,37 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                         }
                     }
                 }
+            } else if strings.HasPrefix(m.Content, "&be ") { // Shop
+                cont := strings.ToLower(m.Content[4:len(m.Content)])
+                split := strings.Split(cont, ">")
+                // This gets rid of final, initial and double spaces
+                // Makes commands easier to type
+                for i, k := range split {
+                    split[i] = FixUnnecesarySpaces(string(k))
+                }
+                if len(split) > 2 {
+                    s.ChannelMessageSend(m.ChannelID, "Expected less than 2 arguments, got " + strconv.Itoa(len(split)))
+                } else {
+                    print(split[0])
+                    if split[0] != "" {
+                        amount := 1
+                        if len(split) != 1 {
+                            amt, err := strconv.Atoi(split[1])
+                            if err != nil {
+                                s.ChannelMessageSend(m.ChannelID, "Second argument is not an integer.")
+                                return
+                            }
+                            amount = amt
+                            for _, i := range teams {
+                                if strings.ToLower(i.Name) == split[0] || i.Icon == split[0] {
+                                    for i, k := range upcoming {
+                                        // TODO Check if i == any of the two teams, look through the bets of the other, do the same with the other team, place bets, then do the system that gives money for bets
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             } else if strings.HasPrefix(m.Content, "&b ") { // Shop
                 cont := strings.ToLower(m.Content[3:len(m.Content)])
                 split := strings.Split(cont, ">")
@@ -957,42 +1011,44 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                 if len(split) > 2 {
                     s.ChannelMessageSend(m.ChannelID, "Expected less than 2 arguments, got " + strconv.Itoa(len(split)))
                 } else {
+                    print(split[0])
                     if split[0] != "" {
                         amount := 1
                         if len(split) != 1 {
-                            amount, err := strconv.Atoi(split[1])
+                            amt, err := strconv.Atoi(split[1])
                             if err != nil {
                                 s.ChannelMessageSend(m.ChannelID, "Second argument is not an integer.")
                                 return
                             }
+                            amount = amt
                         }
 
                         switch split[0] {
                         case "🐍":
                             CheckForShopItem(m.Author.ID, "snoil", 0)
-                            if fans[m.Author.ID].Coins > 10 * amount {
+                            if fans[m.Author.ID].Coins > calculateGrowingPrice(amount - 1 + fans[m.Author.ID].Shop["snoil"], 15, 1.8) {
                                 fans[m.Author.ID].Shop["snoil"] += amount
-                                fans[m.Author.ID].Coins -= 10 * amount
+                                fans[m.Author.ID].Coins -= calculateGrowingPrice(amount - 1 + fans[m.Author.ID].Shop["snoil"], 15, 1.8)
+                                s.ChannelMessageSend(m.ChannelID, "Bought " + strconv.Itoa(amount) + " snake oil for " + strconv.Itoa(calculateGrowingPrice(fans[m.Author.ID].Shop["snoil"]-1, 15, 1.8)) + " coins.")
+                            } else {
+                                s.ChannelMessageSend(m.ChannelID, "Not enough coins.")
                             }
                         case "🎟️":
                             if fans[m.Author.ID].Coins > 100 * amount {
                                 fans[m.Author.ID].Votes += amount
                                 fans[m.Author.ID].Coins -= 100 * amount
+                                s.ChannelMessageSend(m.ChannelID, "Bought " + strconv.Itoa(amount) + " votes for " + strconv.Itoa(100 * amount) + " coins.")
+                            } else {
+                                s.ChannelMessageSend(m.ChannelID, "Not enough coins.")
                             }
                         case "🥺":
                             if fans[m.Author.ID].Coins <= 0 {
                                 fans[m.Author.ID].Coins = rand.Intn(12)
+                                s.ChannelMessageSend(m.ChannelID, "Conversion has succeeded! " + strconv.Itoa(fans[m.Author.ID].Coins) + " coins appear in your pockets.")
+                            } else {
+                                s.ChannelMessageSend(m.ChannelID, "Not enough brokeness.")
                             }
                         }
-
-                    } else {
-                        emb := new(discordgo.MessageEmbed)
-                        emb.Title = "The Shop"
-                        emb.Color = 8651301
-                        AddField(emb, "🐍 Snake Oil (PRICE)", "Increase the maximum amount of money you can bet. It'd go from X to Y.", false)
-                        AddField(emb, "🎟️ Vote (PRICE)", "Participate in Democracy.", false)
-                        AddField(emb, "🥺 Beg (FREE)", "Uses alchemy to convert your brokeness into a few coins.", false)
-                        s.ChannelMessageSendEmbed(m.ChannelID, emb)
                     }
                 }
             }
@@ -1000,15 +1056,22 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
     }
 }
 
+func calculateGrowingPrice(cAmount int, iPrice int, ex float64) int {
+    cAf := float64(cAmount)
+    return iPrice + int(math.Pi * cAf) + int(math.Pow(2.71828 * cAf, ex))
+}
 
 func CreateFanIfNotExist (id string) {
     sh := make(map[string]int)
     sh["flute"] = 1
     if _, ok := fans[id]; !ok {
-        if _, ok := fans[id].Shop["flute"]; !ok {
-            NewFan(id, "", 200, 1, sh, "")
-        }
+        NewFan(id, "", 200, 1, sh, "")
     }
+}
+
+func GetAmountOf(id string, item string) int {
+    CheckForShopItem(id, item, 0)
+    return fans[id].Shop[item]
 }
 
 // This gets rid of final, initial and double spaces, making commands easier to type
