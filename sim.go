@@ -855,7 +855,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
             AddField(emb, "Upcoming Games", text, false)
             s.ChannelMessageSendEmbed(m.ChannelID, emb)
         default:
-            if m.Content[:3] == "&s " {
+            if string.Contains(m.Content, "&s "){
                 cont := strings.ToLower(m.Content[3:len(m.Content)])
                 split := strings.Split(cont, ">")
                 for i := range split {
