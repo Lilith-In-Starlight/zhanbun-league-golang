@@ -73,8 +73,8 @@ type Game struct {
     LastMessage string
 }
 
-const CommandChannelId = "823421429601140756"
-const GamesChannelId = "823421360768417824"
+const CommandChannelId = "822210011882061863"
+const GamesChannelId = "822210201574703114"
 
 var CurrentGamesId string
 var CurrentGamesId2 string
