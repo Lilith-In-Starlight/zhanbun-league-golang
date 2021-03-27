@@ -1029,3 +1029,10 @@ func AddField (embed *discordgo.MessageEmbed, name string, value string, inline 
     new_field.Inline = inline
     embed.Fields = append(embed.Fields, new_field)
 }
+
+/* IN CASE THE DATABASE IS RESET
+
+Comment the parts of the code that load the database, uncomment the parts that
+generate the data, create code that insert them into the database. Once that is
+done, comment the parts that generate and insert and uncomment the parts
+that load it */
