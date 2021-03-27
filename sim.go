@@ -16,7 +16,7 @@ import (
 
     _ "github.com/lib/pq"
     "github.com/bwmarrin/discordgo"
-    "github.com/joho/godotenv"
+    _ "github.com/joho/godotenv"
     "github.com/google/uuid"
 )
 
@@ -232,14 +232,15 @@ func main(){
     // Make sure the RNG is random
     rand.Seed(time.Now().Unix())
     // Load the .env file, this has to be discarded for heroku releases
-    envs, err := godotenv.Read(".env")
-    CheckError(err)
+    // envs, err := godotenv.Read(".env")
+    // CheckError(err)
 
     // Set up the bot using the bot key thats found in the environment variable
-    discord, err := discordgo.New("Bot " + envs["BOT_KEY"])
+    // discord, err := discordgo.New("Bot " + envs["BOT_KEY"])
+    discord, err := discordgo.New("Bot " + os.Getenv("BOT_KEY"))
     CheckError(err)
 
-    db, err := sql.Open("postgres", envs["DATABASE_URL"])
+    db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
     CheckError(err)
 
     // Set up the tables for the players, the teams and the standings
