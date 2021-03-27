@@ -769,7 +769,6 @@ func HandlePlays (session *discordgo.Session, message string, start int, end int
     if output != "" {
         _, err := session.ChannelMessageEdit(GamesChannelId, message, output)
         CheckError(err)
-        print(output)
     }
 }
 
