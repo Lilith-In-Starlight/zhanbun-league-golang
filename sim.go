@@ -16,7 +16,7 @@ import (
 
     _ "github.com/lib/pq"
     "github.com/bwmarrin/discordgo"
-    "github.com/joho/godotenv"
+    _ "github.com/joho/godotenv"
     "github.com/google/uuid"
 )
 
@@ -73,8 +73,8 @@ type Game struct {
     LastMessage string
 }
 
-const CommandChannelId = "823421429601140756"
-const GamesChannelId = "823421360768417824"
+const CommandChannelId = "822210011882061863"
+const GamesChannelId = "822210201574703114"
 
 var CurrentGamesId string
 var CurrentGamesId2 string
@@ -232,16 +232,16 @@ func main(){
     // Make sure the RNG is random
     rand.Seed(time.Now().Unix())
     // Load the .env file, this has to be discarded for heroku releases
-    envs, err := godotenv.Read(".env")
-    CheckError(err)
+    // envs, err := godotenv.Read(".env")
+    // CheckError(err)
 
     // Set up the bot using the bot key thats found in the environment variable
-    discord, err := discordgo.New("Bot " + envs["BOT_KEY"])
-    // discord, err := discordgo.New("Bot " + os.Getenv("BOT_KEY"))
+    // discord, err := discordgo.New("Bot " + envs["BOT_KEY"])
+    discord, err := discordgo.New("Bot " + os.Getenv("BOT_KEY"))
     CheckError(err)
 
-    db, err := sql.Open("postgres", envs["DATABASE_URL"])
-    //db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
+    // db, err := sql.Open("postgres", envs["DATABASE_URL"])
+    db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
     CheckError(err)
 
     // Set up the tables for the players, the teams and the standings
@@ -670,11 +670,11 @@ func HandlePlays (session *discordgo.Session, message string, start int, end int
                         }
                         game.AnnouncementStates = append(game.AnnouncementStates, *game)
                         if runsScored != 0 {
-                            /*if game.Top {
+                            if game.Top {
                                 game.RunsHome += runsScored
                             } else {
                                 game.RunsAway += runsScored
-                            }*/ // TEST
+                            }
                             if runsScored == 1 {
                                 game.Announcements = append(game.Announcements, strconv.Itoa(runsScored) + " run scored.")
                             } else {
@@ -767,9 +767,8 @@ func HandlePlays (session *discordgo.Session, message string, start int, end int
         }
     }
     if output != "" {
-        // _, err := session.ChannelMessageEdit(GamesChannelId, message, output)
-        // CheckError(err)
-        // TEST
+        _, err := session.ChannelMessageEdit(GamesChannelId, message, output)
+        CheckError(err)
         print(output)
     }
 }
