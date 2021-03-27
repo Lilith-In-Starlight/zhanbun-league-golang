@@ -801,6 +801,8 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
             emb.Color = 8651301
             AddField(emb, "&help", "Displays this list.", false)
             AddField(emb, "&st", "Shows a list of all teams.", false)
+            AddField(emb, "&u", "Shows all the upcoming games.", false)
+            AddField(emb, "&s", "Searches for a team or a player. &st [team name | icon] > (player name)", false)
             /*emb.AddField("&help", "Sends this list of commands.")
             emb.AddField("&st", "Shows a list of all teams.")*/
             s.ChannelMessageSendEmbed(m.ChannelID, emb)
@@ -823,6 +825,16 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
             for k := range fun_league {
                 AddField(emb, teams[fun_league[k]].Icon + " " + teams[fun_league[k]].Name, teams[fun_league[k]].Description, false)
             }
+            s.ChannelMessageSendEmbed(m.ChannelID, emb)
+
+        case "&u":
+            emb := new(discordgo.MessageEmbed)
+            emb.Color = 8651301
+            text := ""
+            for k := range games {
+                text += teams[games[k].Home].Icon + " " + teams[games[k].Home].Name + " - " + teams[games[k].Away].Name + " " + teams[games[k].Away].Icon + "\n"
+            }
+            AddField(emb, "Upcoming Games", text, false)
             s.ChannelMessageSendEmbed(m.ChannelID, emb)
         default:
             if m.Content[:3] == "&s " {
