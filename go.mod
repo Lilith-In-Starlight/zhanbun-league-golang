@@ -1,4 +1,4 @@
-module ampersandia.net
+module ampersandia.net/zlb
 
 go 1.16
 
