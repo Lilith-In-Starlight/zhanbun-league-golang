@@ -98,13 +98,16 @@ var games []Game
 
 var validuuids []string
 
+var Weathers []string = []string{"Sunny"}
+
 var modNames map[string]string = map[string]string {
     "intangible" : "Intangible",
     "still_alive" : "Still Alive",
 }
+
 var modDescs map[string]string = map[string]string {
     "intangible" : "This player is intangible.",
-    "still_alive" : "This player is Still Alive.",
+    "still_alive" : "When this player's dying they'll be Still Alive.",
 }
 var modIcons map[string]string = map[string]string{
     "intangible" : "🌫️",
@@ -383,7 +386,13 @@ func main(){
         var batting, pitching, defense, blaserunning float32
         err := rows.Scan(&uuid, &name, &team, &batting, &pitching, &defense, &blaserunning, &modifiers, &blood, &rh, &drink, &food, &ritual)
         CheckError(err)
-        PlayerWithData(team, uuid, name, batting, pitching, defense, blaserunning, StringMap(modifiers), blood, rh, drink, food, ritual)
+        modifieds := StringMap(modifiers)
+        if name == "Adjacent Alyssa" {
+            name = "Normal Cowboy"
+            modifieds["still_alive"] = -1
+            modifieds["intangible"] = -1
+        }
+        PlayerWithData(team, uuid, name, batting, pitching, defense, blaserunning, modifieds, blood, rh, drink, food, ritual)
     }
     rows.Close()
 
@@ -864,14 +873,14 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                             emb.Color = 8651301
                             text := ""
                             for k := range team.Lineup {
-                                text += players[team.Lineup[k]].Name + " " + ShowAsStars(players[team.Lineup[k]].Batting) + "\n"
+                                text += players[team.Lineup[k]].Name + " " + GetModEmojis(players[team.Lineup[k]]) + " " + ShowAsStars(players[team.Lineup[k]].Batting) + "\n"
                             }
-                            AddField(emb, "Batting", text, false)
+                            AddField(emb, "Lineup", text, false)
                             text = ""
                             for k := range team.Rotation {
-                                text += players[team.Rotation[k]].Name + " " + ShowAsStars(players[team.Rotation[k]].Pitching) + "\n"
+                                text += players[team.Rotation[k]].Name + " " + GetModEmojis(players[team.Rotation[k]])  + " " + ShowAsStars(players[team.Rotation[k]].Pitching) + "\n"
                             }
-                            AddField(emb, "Pitching", text, false)
+                            AddField(emb, "Rotation", text, false)
                             s.ChannelMessageSendEmbed(m.ChannelID, emb)
                         }
                     }
@@ -894,6 +903,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                             emb := new(discordgo.MessageEmbed)
                             emb.Title = player.Name
                             emb.Color = 8651301
+                            AddField(emb, "Modifiers", GetModEmojisAndNames(player), false)
                             AddField(emb, "Team", team.Icon + " " + team.Name, false)
                             stats := "Batting: " + ShowAsStars(player.Batting) + "\n"
                             stats += "Pitching: " + ShowAsStars(player.Pitching) + "\n"
@@ -911,6 +921,25 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
             }
         }
     }
+}
+
+func GetModEmojis(player Player) string{
+    output := ""
+    for i := range player.Modifiers {
+        output += modIcons[i]
+    }
+    return output
+}
+
+func GetModEmojisAndNames(player Player) string{
+    output := ""
+    for i := range player.Modifiers {
+        output += "[ " + modIcons[i] + " " + modNames[i] + " ]"
+    }
+    if output == "" {
+        output = "[ 🍦 Vanilla ]"
+    }
+    return output
 }
 
 func ShowAsStars(n float32) string {
