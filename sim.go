@@ -16,7 +16,7 @@ import (
 
     _ "github.com/lib/pq"
     "github.com/bwmarrin/discordgo"
-    _ "github.com/joho/godotenv"
+    "github.com/joho/godotenv"
     "github.com/google/uuid"
 )
 
@@ -72,9 +72,17 @@ type Game struct {
     Pitcher Player
     LastMessage string
 }
+type Fan struct {
+    Id string
+    Team string
+    Coins int
+    Votes int
+    Shop map[string]int
+    Stan string
+}
 
-const CommandChannelId = "822210011882061863"
-const GamesChannelId = "822210201574703114"
+const CommandChannelId = "823421429601140756"
+const GamesChannelId = "823421360768417824"
 
 var CurrentGamesId string
 var CurrentGamesId2 string
@@ -85,6 +93,7 @@ var fun_league [10]string
 
 var players map[string]Player
 var teams map[string]Team
+var fans map[string]Fan
 
 var name_pool []string
 var drink_pool []string
@@ -151,7 +160,7 @@ func PlayerWithData(team string, uuid string, name string, batting float32, pitc
     player.Modifiers = modifiers
     // Players have a 20% chance of being ghosts
     if rand.Float32() < 0.2 {
-        team.Modifiers["intangible"] = -1
+        player.Modifiers["intangible"] = -1
     }
     player.Blood = blood
     player.Rh = rh
@@ -226,22 +235,35 @@ func NewGame(home string, away string, innings int) {
     upcoming = append(upcoming, *game)
 }
 
+func NewFan (id string, team string, coins int, votes int, shop map[string]int, stan string) string {
+    fan := new(Fan)
+    fan.Id = id
+    fan.Team = team
+    fan.Coins = coins
+    fan.Votes = votes
+    fan.Shop = shop
+    fan.Stan = stan
+    fans[fan.Id] = *fan
+    return fan.Id
+}
+
 func main(){
     players = make(map[string]Player)
     teams = make(map[string]Team)
+    fans = make(map[string]Fan)
     // Make sure the RNG is random
     rand.Seed(time.Now().Unix())
     // Load the .env file, this has to be discarded for heroku releases
-    // envs, err := godotenv.Read(".env")
-    // CheckError(err)
-
-    // Set up the bot using the bot key thats found in the environment variable
-    // discord, err := discordgo.New("Bot " + envs["BOT_KEY"])
-    discord, err := discordgo.New("Bot " + os.Getenv("BOT_KEY"))
+    envs, err := godotenv.Read(".env")
     CheckError(err)
 
-    // db, err := sql.Open("postgres", envs["DATABASE_URL"])
-    db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
+    // Set up the bot using the bot key thats found in the environment variable
+    discord, err := discordgo.New("Bot " + envs["BOT_KEY"])
+    // discord, err := discordgo.New("Bot " + os.Getenv("BOT_KEY"))
+    CheckError(err)
+
+    db, err := sql.Open("postgres", envs["DATABASE_URL"])
+    // db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
     CheckError(err)
 
     // Set up the tables for the players, the teams and the standings
@@ -272,17 +294,14 @@ func main(){
         avg_def FLOAT8,
         current_pitcher INTEGER
     )`)
-
+    _, err = db.Exec(`DROP TABLE fans`)
     _, err = db.Exec(`CREATE TABLE IF NOT EXISTS fans(
         id TEXT PRIMARY KEY,
         favorite_team TEXT,
         coins INTEGER,
         votes INTEGER,
-        snoil INTEGER,
-        idol TEXT,
-        strikeout_amulets INTEGER,
-        run_amulet INTEGER,
-        home_run_amulet INTEGER,
+        shop TEXT,
+        stan TEXT,
     )`)
 
     // Setup the pools
@@ -849,23 +868,11 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
             AddField(emb, "Upcoming Games", text, false)
             s.ChannelMessageSendEmbed(m.ChannelID, emb)
         default:
-            if string.Contains(m.Content, "&s "){
+            if strings.HasPrefix(m.Content, "&s ") {
                 cont := strings.ToLower(m.Content[3:len(m.Content)])
                 split := strings.Split(cont, ">")
                 for i := range split {
-                    // This gets rid of final, initial and double spaces
-                    // Makes commands easier to type
-                    if split[i] != "" {
-                        for string(split[i][len(split[i])-1]) == " " {
-                            split[i] = split[i][0:len(split[i])-1]
-                        }
-                        for string(split[i][0]) == " " {
-                            split[i] = split[i][1:len(split[i])]
-                        }
-                        for strings.Contains(split[i], "  ") {
-                            split[i] = strings.ReplaceAll(split[i], "  ", " ")
-                        }
-                    }
+                    FixUnnecesarySpaces(split[i])
                 }
                 // Fan inserted more than three args on command
                 if len(split) > 3 {
@@ -924,9 +931,110 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                         }
                     }
                 }
+            } else if strings.HasPrefix(m.Content, "&f ") { // Favoriting teams
+                cont := strings.ToLower(m.Content[3:len(m.Content)])
+                FixUnnecesarySpaces(cont)
+                if CheckForShopItem(m.Author.ID, "flute", 1) > 0 {
+                    for i := range teams {
+                        team := teams[i]
+                        if strings.ToLower(team.Name) == strings.ToLower(cont) || team.Icon == cont {
+                            emb := new(discordgo.MessageEmbed)
+                            emb.Title = "Favorite team set"
+                            emb.Color = 8651301
+                            AddField(emb, teams[i].Icon + " " + teams[i].Name, teams[i].Description, false)
+                            s.ChannelMessageSendEmbed(m.ChannelID, emb)
+                        }
+                    }
+                }
+            } else if strings.HasPrefix(m.Content, "&b ") { // Shop
+                cont := strings.ToLower(m.Content[3:len(m.Content)])
+                split := strings.Split(cont, ">")
+                // This gets rid of final, initial and double spaces
+                // Makes commands easier to type
+                for i, k := range split {
+                    split[i] = FixUnnecesarySpaces(string(k))
+                }
+                if len(split) > 2 {
+                    s.ChannelMessageSend(m.ChannelID, "Expected less than 2 arguments, got " + strconv.Itoa(len(split)))
+                } else {
+                    if split[0] != "" {
+                        amount := 1
+                        if len(split) != 1 {
+                            amount, err := strconv.Atoi(split[1])
+                            if err != nil {
+                                s.ChannelMessageSend(m.ChannelID, "Second argument is not an integer.")
+                                return
+                            }
+                        }
+
+                        switch split[0] {
+                        case "🐍":
+                            CheckForShopItem(m.Author.ID, "snoil", 0)
+                            if fans[m.Author.ID].Coins > 10 * amount {
+                                fans[m.Author.ID].Shop["snoil"] += amount
+                                fans[m.Author.ID].Coins -= 10 * amount
+                            }
+                        case "🎟️":
+                            if fans[m.Author.ID].Coins > 100 * amount {
+                                fans[m.Author.ID].Votes += amount
+                                fans[m.Author.ID].Coins -= 100 * amount
+                            }
+                        case "🥺":
+                            if fans[m.Author.ID].Coins <= 0 {
+                                fans[m.Author.ID].Coins = rand.Intn(12)
+                            }
+                        }
+
+                    } else {
+                        emb := new(discordgo.MessageEmbed)
+                        emb.Title = "The Shop"
+                        emb.Color = 8651301
+                        AddField(emb, "🐍 Snake Oil (PRICE)", "Increase the maximum amount of money you can bet. It'd go from X to Y.", false)
+                        AddField(emb, "🎟️ Vote (PRICE)", "Participate in Democracy.", false)
+                        AddField(emb, "🥺 Beg (FREE)", "Uses alchemy to convert your brokeness into a few coins.", false)
+                        s.ChannelMessageSendEmbed(m.ChannelID, emb)
+                    }
+                }
             }
         }
     }
+}
+
+
+func CreateFanIfNotExist (id string) {
+    sh := make(map[string]int)
+    sh["flute"] = 1
+    if _, ok := fans[id]; !ok {
+        if _, ok := fans[id].Shop["flute"]; !ok {
+            NewFan(id, "", 200, 1, sh, "")
+        }
+    }
+}
+
+// This gets rid of final, initial and double spaces, making commands easier to type
+func FixUnnecesarySpaces(str string) string {
+    output := str
+    if output != "" {
+        for strings.Contains(output, "  ") {
+            output = strings.ReplaceAll(output, "  ", " ")
+        }
+        for string(output[len(output)-1]) == " " {
+            output = output[0:len(output)-1]
+        }
+        for string(output[0]) == " " {
+            output = output[1:len(output)]
+        }
+    }
+    return output
+}
+
+func CheckForShopItem (id string, item string, retval int) int {
+    CreateFanIfNotExist(id)
+    if valI, ok := fans[id].Shop[item]; ok {
+        return valI
+    }
+    fans[id].Shop[item] = retval
+    return retval
 }
 
 // Returns the emojis of a player's modifications
