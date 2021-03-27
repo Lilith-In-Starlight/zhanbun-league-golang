@@ -138,7 +138,7 @@ func NewPlayer(team string) string {
     return player.UUID
 }
 
-// Creates a specific player with given data
+// Creates a specific player with given data, returns the UUID
 func PlayerWithData(team string, uuid string, name string, batting float32, pitching float32, defense float32, blaserunning float32, modifiers map[string]int, blood string, rh string, drink string, food string, ritual string) string {
     player := new(Player)
     player.UUID = uuid
@@ -148,7 +148,11 @@ func PlayerWithData(team string, uuid string, name string, batting float32, pitc
     player.Pitching = pitching
     player.Defense = defense
     player.Blaserunning = blaserunning
-    player.Modifiers = modifiers // TODO: Parse :; to map
+    player.Modifiers = modifiers
+    // Players have a 20% chance of being ghosts
+    if rand.Float32() < 0.2 {
+        team.Modifiers["intangible"] = -1
+    }
     player.Blood = blood
     player.Rh = rh
     player.Drink = drink
@@ -167,7 +171,7 @@ func GeneratePlayers(team string, amount int) []string {
     return ret
 }
 
-// Creates a team with the given name, slogan and icon
+// Creates a team with the given name, slogan and icon, returns UUID
 func NewTeam(name string, description string, icon string) string {
     team := new(Team)
     team.UUID = uuid.NewString()
@@ -177,11 +181,6 @@ func NewTeam(name string, description string, icon string) string {
     team.Lineup = GeneratePlayers(team.UUID, 10)
     team.Rotation = GeneratePlayers(team.UUID, 2)
     team.Modifiers = make(map[string]int)
-
-    // Players have a 20% chance of being ghosts
-    if rand.Float32() < 0.2 {
-        team.Modifiers["intangible"] = -1
-    }
     team.AvgDef = 0
     for k := range(team.Lineup) {
         team.AvgDef += players[team.Lineup[k]].Defense
@@ -192,7 +191,7 @@ func NewTeam(name string, description string, icon string) string {
     return team.UUID
 }
 
-// Creates a team with the speficied data
+// Creates a team with the speficied data, returns the UUID
 func TeamWithData(name string, description string, icon string, uuid string, lineup []string, rotation []string, modifiers map[string]int, avgDef float32, currentPitcher int) string {
     team := new(Team)
     team.UUID = uuid
@@ -208,6 +207,7 @@ func TeamWithData(name string, description string, icon string, uuid string, lin
     return team.UUID
 }
 
+// Creates a new game and puts it in upcoming
 func NewGame(home string, away string, innings int) {
     game := new(Game)
     game.Home = home
@@ -245,11 +245,6 @@ func main(){
     CheckError(err)
 
     // Set up the tables for the players, the teams and the standings
-
-
-
-    CheckError(err)
-
     _, err = db.Exec(`CREATE TABLE IF NOT EXISTS players(
         uuid TEXT PRIMARY KEY,
         name TEXT,
@@ -411,6 +406,7 @@ func main(){
 
     rows.Close()
 
+    // This was used to generate the leagues. Only use it if the database is reset
     /*i := 0
     j := 0
     for k := range teams {
@@ -440,13 +436,6 @@ func main(){
     }
 
     rows.Close()
-
-
-
-    for k := 0; k < 10; k++ {
-
-    }
-
 
     // Creates the teams
     /*NewTeam("Pacificside Transcendentals", "To Infinity And Beyond", "🎭")
@@ -496,7 +485,7 @@ func main(){
     CheckError(err)
 
 
-
+    // Open the goroutine that handles upcoming and current games
     go HandleGames(discord)
     time.Sleep(0)
 
@@ -506,7 +495,7 @@ func main(){
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 	<-sc
 
-	// Cleanly close down the Discord session.
+	// Cleanly close down the Discord session and the database.
 	fmt.Println("Closing bot.")
     db.Close()
     discord.Close()
@@ -514,20 +503,23 @@ func main(){
 
 func HandleGames(session *discordgo.Session) {
     for true {
+        // If there's upcoming games, but no games are currently being played
         if len(upcoming) > 0 && len(games) == 0 {
+            // The three messages for the games
             msg, _ := session.ChannelMessageSend(GamesChannelId, "**Preparing Games**")
             CurrentGamesId = msg.ID
             msg, _ = session.ChannelMessageSend(GamesChannelId, "**Preparing Games**")
             CurrentGamesId2 = msg.ID
             msg, _ = session.ChannelMessageSend(GamesChannelId, "**Preparing Games**")
             CurrentGamesId3 = msg.ID
+
+            // Send the upcoming games to the currently played games
             for k := range upcoming {
                 games = append(games, upcoming[k])
-                // go Handle(&games[len(games)-1], k, session)
-
             }
             upcoming = make([]Game, 0)
-        } else if len(games) == 0 {
+
+        } else if len(games) == 0 { // If there are no upcoming games nor current games
             i := 0
             var TeamA string
             var TeamB string
@@ -542,6 +534,8 @@ func HandleGames(session *discordgo.Session) {
             }
         }
 
+        /* The games have to be divided in three messages
+        To avoid running up against the character limit */
         if len(games) > 0 {
             if len(games) > 6 {
                 HandlePlays(session, CurrentGamesId, 0, 3)
@@ -859,6 +853,8 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                 cont := strings.ToLower(m.Content[3:len(m.Content)])
                 split := strings.Split(cont, ">")
                 for i := range split {
+                    // This gets rid of final, initial and double spaces
+                    // Makes commands easier to type
                     if split[i] != "" {
                         for string(split[i][len(split[i])-1]) == " " {
                             split[i] = split[i][0:len(split[i])-1]
@@ -871,9 +867,10 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                         }
                     }
                 }
+                // Fan inserted more than three args on command
                 if len(split) > 3 {
                     s.ChannelMessageSend(m.ChannelID, "Expected less than 3 arguments, got " + strconv.Itoa(len(split)))
-                } else if len(split) == 1 {
+                } else if len(split) == 1 { // Only look for a team
                     for i := range teams {
                         team := teams[i]
                         if strings.ToLower(team.Name) == strings.ToLower(split[0]) || team.Icon == split[0] {
@@ -893,7 +890,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                             s.ChannelMessageSendEmbed(m.ChannelID, emb)
                         }
                     }
-                } else if len(split) == 2 {
+                } else if len(split) == 2 { // Look for a player
                     for i := range teams {
                         team := teams[i]
                         if strings.ToLower(team.Name) == strings.ToLower(split[0]) || team.Icon == split[0] {
@@ -932,6 +929,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
     }
 }
 
+// Returns the emojis of a player's modifications
 func GetModEmojis(player Player) string{
     output := ""
     for i := range player.Modifiers {
@@ -940,17 +938,19 @@ func GetModEmojis(player Player) string{
     return output
 }
 
+// Returns [EMOJI mod_name] of a player's modifications
 func GetModEmojisAndNames(player Player) string{
     output := ""
     for i := range player.Modifiers {
         output += "[ " + modIcons[i] + " " + modNames[i] + " ]"
     }
     if output == "" {
-        output = "[ 🍦 Vanilla ]"
+        output = "[ 🍦 Vanilla ]" // No modifiers
     }
     return output
 }
 
+// Expresses a float32 as an int. Used showing stats
 func ShowAsStars(n float32) string {
     i := int(math.Floor(float64(n)))
     output := ""
