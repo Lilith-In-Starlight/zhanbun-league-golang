@@ -994,6 +994,29 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                                 if strings.ToLower(i.Name) == split[0] || i.Icon == split[0] {
                                     for i, k := range upcoming {
                                         // TODO Check if i == any of the two teams, look through the bets of the other, do the same with the other team, place bets, then do the system that gives money for bets
+                                        if i == k.Home {
+                                            canBet := false
+                                            for _, a := range k.betsAway {
+                                                canBet = true
+                                            }
+                                            if canBet {
+                                                games[i].betsHome = games[i].betsHome.append(m.Author.ID)
+                                                s.ChannelMessageSend(m.ChannelID, "Bet placed!")
+                                            } else {
+                                                s.ChannelMessageSend(m.ChannelID, "You've already bet for that game.")
+                                            }
+                                        } else if i == k.Away {
+                                            canBet := false
+                                            for _, a := range k.betsHome {
+                                                canBet = true
+                                            }
+                                            if canBet {
+                                                games[i].betsAaway = games[i].betsAway.append(m.Author.ID)
+                                                s.ChannelMessageSend(m.ChannelID, "Bet placed!")
+                                            } else {
+                                                s.ChannelMessageSend(m.ChannelID, "You've already bet for that game.")
+                                            }
+                                        }
                                     }
                                 }
                             }
