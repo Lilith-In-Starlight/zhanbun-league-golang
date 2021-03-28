@@ -1440,7 +1440,7 @@ func updateDatabases(db *sql.DB) {
     for k := range fans {
         fan := fans[k]
         command := `INSERT INTO fans VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO UPDATE SET favorite_team = excluded.favorite_team, coins = excluded.coins, votes = excluded.votes, shop = excluded.shop, stan = excluded.stan`
-        _, err := db.Exec(command, fan.Id, fan.Team, fan.Coins, fan.Votes, SliceString(fan.Shop), fan.Stan)
+        _, err := db.Exec(command, fan.Id, fan.Team, fan.Coins, fan.Votes, MapString(fan.Shop), fan.Stan)
         CheckError(err)
     }
 }
