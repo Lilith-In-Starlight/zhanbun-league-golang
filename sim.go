@@ -564,7 +564,7 @@ func main(){
     discord.Close()
 }
 
-func HandleGames(session *discordgo.Session, db *DB) {
+func HandleGames(session *discordgo.Session, db *sql.DB) {
     for true {
         // If there's upcoming games, but no games are currently being played
         if len(upcoming) > 0 && len(games) == 0 {
@@ -1423,7 +1423,7 @@ func AddField (embed *discordgo.MessageEmbed, name string, value string, inline 
     embed.Fields = append(embed.Fields, new_field)
 }
 
-func updateDatabases(db *DB) {
+func updateDatabases(db *sql.DB) {
     for k := range teams {
         team := teams[k]
         command := `INSERT INTO teams VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (uuid) DO UPDATE SET modifiers = excluded.modifiers, lineup = excluded.lineup, rotation = excluded.rotation, current_pitcher = excluded.current_pitcher`
