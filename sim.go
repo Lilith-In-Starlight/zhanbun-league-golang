@@ -71,8 +71,8 @@ type Game struct {
     Batter Player
     Pitcher Player
     LastMessage string
-    betsHome []string
-    betsAway []string
+    betsHome map[string]int
+    betsAway map[string]int
 }
 type Fan struct {
     Id string
@@ -742,6 +742,17 @@ func HandlePlays (session *discordgo.Session, message string, start int, end int
                             // Game is Over
                             if game.RunsAway != game.RunsHome && game.Inning >= 9 {
                                 games = append(games[:k], games[k+1:]...)
+                                // TODO give money to the players that bet
+                                // TODO send "game ended" message
+                                if game.RunsAway > game.RunsHome {
+                                    for i, j := range game.betsAway {
+                                        fans[i].Coins += j * 2 + rand.Intn(7) - 1
+                                    }
+                                } else {
+                                    for i, j := range game.betsHome {
+                                        fans[i].Coins += j * 2 + rand.Intn(7) - 1
+                                    }
+                                }
                                 fmt.Println("Finished")
                                 break Loop
                             }
@@ -993,25 +1004,28 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                             for _, i := range teams {
                                 if strings.ToLower(i.Name) == split[0] || i.Icon == split[0] {
                                     for i, k := range upcoming {
-                                        // TODO Check if i == any of the two teams, look through the bets of the other, do the same with the other team, place bets, then do the system that gives money for bets
                                         if i == k.Home {
-                                            canBet := false
-                                            for _, a := range k.betsAway {
-                                                canBet = true
+                                            canBet := true
+                                            for i := range k.betsAway {
+                                                if i == m.Author.ID {
+                                                    canBet = false
+                                                }
                                             }
                                             if canBet {
-                                                games[i].betsHome = games[i].betsHome.append(m.Author.ID)
+                                                games[i].betsHome[m.Author.ID] = amount
                                                 s.ChannelMessageSend(m.ChannelID, "Bet placed!")
                                             } else {
                                                 s.ChannelMessageSend(m.ChannelID, "You've already bet for that game.")
                                             }
                                         } else if i == k.Away {
-                                            canBet := false
-                                            for _, a := range k.betsHome {
-                                                canBet = true
+                                            canBet := true
+                                            for i := range k.betsHome {
+                                                if i == m.Author.ID {
+                                                    canBet = false
+                                                }
                                             }
                                             if canBet {
-                                                games[i].betsAaway = games[i].betsAway.append(m.Author.ID)
+                                                games[i].betsAway[m.Author.ID] = amount
                                                 s.ChannelMessageSend(m.ChannelID, "Bet placed!")
                                             } else {
                                                 s.ChannelMessageSend(m.ChannelID, "You've already bet for that game.")
