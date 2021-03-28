@@ -7,6 +7,7 @@ import (
     "os"
     "os/signal"
     "syscall"
+    _ "encoding/json"
     _ "io/ioutil"
     "database/sql"
     "math/rand"
@@ -110,20 +111,44 @@ var games []*Game
 
 var validuuids []string
 
-var Weathers []string = []string{"Sunny"}
+
+var mods []string = []string{"ash_twin", "ember_twin", "still_alive", "haunted"}
 
 var modNames map[string]string = map[string]string {
-    "intangible" : "Intangible",
+    "ash_twin" : "Ash Twin",
+    "ember_twin" : "Ember Twin",
     "still_alive" : "Still Alive",
+    "haunted" : "Haunted",
 }
-
 var modDescs map[string]string = map[string]string {
-    "intangible" : "This player is intangible.",
+    "ash_twin" : "This player is an Ash Twin.",
+    "ember_twin" : "This player might be paired with an Ash Twin.",
     "still_alive" : "When this player's dying they'll be Still Alive.",
+    "haunted" : "This players sees players who aren't there.",
 }
 var modIcons map[string]string = map[string]string{
-    "intangible" : "🌫️",
+    "ash_twin" : "🌫️",
+    "ember_twin" : "💫",
     "still_alive" : "🐱",
+    "haunted" : "👥",
+}
+
+var weathers []string = []string{"ash", "ember", "feedback"}
+
+var weatherNames map[string]string = map[string]string {
+    "ash" : "Ashes",
+    "ember" : "Embers",
+    "feedback" : "Feedback",
+}
+var weatherDescs map[string]string = map[string]string {
+    "ash" : "Pitchers may be haunted, and players may be Paired",
+    "ember" : "Batters may become ember twins.",
+    "feedback" : "Players may receive feedback.",
+}
+var weatherIcons map[string]string = map[string]string{
+    "ash" : "🌫️",
+    "ember" : "🐱",
+    "feedback" : "🎙️",
 }
 
 /* The modifiers, the lineup and the rotation are all stored in json format. */
@@ -161,10 +186,6 @@ func PlayerWithData(team string, uuid string, name string, batting float32, pitc
     player.Defense = defense
     player.Blaserunning = blaserunning
     player.Modifiers = modifiers
-    // Players have a 20% chance of being ghosts
-    if rand.Float32() < 0.2 {
-        player.Modifiers["intangible"] = -1
-    }
     player.Blood = blood
     player.Rh = rh
     player.Drink = drink
@@ -225,7 +246,7 @@ func NewGame(home string, away string, innings int) {
     game.Home = home
     game.Away = away
     game.BatterHome, game.BatterAway = 0, 0
-    game.Weather = "rain"
+    game.Weather = weathers[rand.Intn(len(weathers))]
     game.Inning = 1
     game.MaxInnings = innings
     game.Top = true
@@ -300,7 +321,6 @@ func main(){
         avg_def FLOAT8,
         current_pitcher INTEGER
     )`)
-    _, err = db.Exec(`DROP TABLE fans`)
     _, err = db.Exec(`CREATE TABLE IF NOT EXISTS fans(
         id TEXT PRIMARY KEY,
         favorite_team TEXT,
@@ -396,7 +416,7 @@ func main(){
         err = rows.Scan(&get)
         CheckError(err)
         get = strings.Replace(get, "\r", "", -1)
-        rh_pool = append(ritual_pool, get)
+        ritual_pool = append(ritual_pool, get)
     }
     rows.Close()
 
@@ -409,10 +429,8 @@ func main(){
         err := rows.Scan(&uuid, &name, &team, &batting, &pitching, &defense, &blaserunning, &modifiers, &blood, &rh, &drink, &food, &ritual)
         CheckError(err)
         modifieds := StringMap(modifiers)
-        if name == "Adjacent Alyssa" {
-            name = "Normal Cowboy"
+        if name == "Normal Cowboy" {
             modifieds["still_alive"] = -1
-            modifieds["intangible"] = -1
         }
         PlayerWithData(team, uuid, name, batting, pitching, defense, blaserunning, modifieds, blood, rh, drink, food, ritual)
     }
@@ -425,11 +443,14 @@ func main(){
         var AvgDef float32
         var currentPitcher int
         err := rows.Scan(&uuid, &name, &description, &icon, &lineup, &rotation, &modifiers, &AvgDef, &currentPitcher)
+        modi := StringMap(modifiers)
         CheckError(err)
-        TeamWithData(name, description, icon, uuid, StringSlice(lineup), StringSlice(rotation), StringMap(modifiers), AvgDef, currentPitcher)
+        TeamWithData(name, description, icon, uuid, StringSlice(lineup), StringSlice(rotation), modi, AvgDef, currentPitcher)
     }
 
     rows.Close()
+
+
 
     // This was used to generate the leagues. Only use it if the database is reset
     /*i := 0
@@ -461,6 +482,23 @@ func main(){
     }
 
     rows.Close()
+
+
+    /*text, err := json.Marshal(players)
+    err = ioutil.WriteFile("players.json", text, 0644)
+
+    text, err = json.Marshal(teams)
+    err = ioutil.WriteFile("teams.json", text, 0644)
+
+    text, err = json.Marshal(fans)
+    err = ioutil.WriteFile("fans.json", text, 0644)
+
+    text, err = json.Marshal(cool_league)
+    err = ioutil.WriteFile("cool.json", text, 0644)
+
+    text, err = json.Marshal(fun_league)
+    err = ioutil.WriteFile("fun.json", text, 0644)*/
+
 
     // Creates the teams
     /*NewTeam("Pacificside Transcendentals", "To Infinity And Beyond", "🎭")
@@ -611,11 +649,13 @@ func HandlePlays (session *discordgo.Session, message string, start int, end int
                     game.PitchingTeam = *teams[game.Away]
                     game.Batter = *players[game.BattingTeam.Lineup[game.BatterHome]]
                     game.Pitcher = *players[game.PitchingTeam.Rotation[game.PitchingTeam.CurrentPitcher]]
+                    batterNumber := game.BatterHome
                     if !game.Top {
                         game.BattingTeam  = *teams[game.Away]
                         game.PitchingTeam = *teams[game.Home]
                         game.Batter = *players[game.BattingTeam.Lineup[game.BatterAway]]
                         game.Pitcher = *players[game.PitchingTeam.Rotation[game.PitchingTeam.CurrentPitcher]]
+                        batterNumber = game.BatterAway
                     }
 
                     if game.InningState == "starting" {
@@ -634,7 +674,6 @@ func HandlePlays (session *discordgo.Session, message string, start int, end int
 
                         game.InningState = "inning"
                     }
-
                     // If in the last tick it was determined that the batter should change
                     if game.ChangeBatter {
                         game.Strikes = 0
@@ -642,15 +681,33 @@ func HandlePlays (session *discordgo.Session, message string, start int, end int
                         if !game.Top {
                             game.BatterAway = (game.BatterAway + 1) % len(game.BattingTeam.Lineup)
                             game.Batter = *players[game.BattingTeam.Lineup[game.BatterAway]]
+                            batterNumber = game.BatterAway
                         } else {
                             game.BatterHome = (game.BatterHome + 1) % len(game.BattingTeam.Lineup)
                             game.Batter = *players[game.BattingTeam.Lineup[game.BatterHome]]
+                            batterNumber = game.BatterHome
                         }
                         game.Announcements = append(game.Announcements, game.Batter.Name + " batting for the " + game.BattingTeam.Name)
                         game.AnnouncementStates = append(game.AnnouncementStates, *game)
                         game.ChangeBatter = false
                     }
+                    appended := DoWeather(teams[game.BattingTeam.UUID], teams[game.PitchingTeam.UUID], game.Weather, batterNumber)
+                    // Update them one last time in case the weather did something
 
+                    game.BattingTeam = *teams[game.Home]
+                    game.PitchingTeam = *teams[game.Away]
+                    game.Pitcher = *players[game.PitchingTeam.Rotation[game.PitchingTeam.CurrentPitcher]]
+                    game.Batter = *players[game.BattingTeam.Lineup[game.BatterHome]]
+                    if !game.Top {
+                        game.BattingTeam = *teams[game.Away]
+                        game.PitchingTeam = *teams[game.Home]
+                        game.Batter = *players[game.BattingTeam.Lineup[game.BatterAway]]
+                    }
+
+                    game.Announcements = append(game.Announcements, appended...)
+                    for _ = range appended {
+                        game.AnnouncementStates = append(game.AnnouncementStates, *game)
+                    }
                     if game.InningState == "inning" {
                         probability := game.Batter.Batting + game.Pitcher.Pitching //The range of probabilities
                         happen := rand.Float32() * probability // What actually happens
@@ -804,10 +861,11 @@ func HandlePlays (session *discordgo.Session, message string, start int, end int
             this_output += "**" + teams[game.Home].Name + " at " + teams[game.Away].Name + "**" + "\n"
             this_output += teams[game.Home].Icon + " **" + teams[game.Home].Name + "** (" + strconv.Itoa(game.AnnouncementStates[0].RunsHome) + ")\n"
             if game.AnnouncementStates[0].Top {
-                this_output += "🔺" + strconv.Itoa(game.AnnouncementStates[0].Inning) + "\n"
+                this_output += "🔺"
             } else {
-                this_output += "🔻" + strconv.Itoa(game.AnnouncementStates[0].Inning) + "\n"
+                this_output += "🔻"
             }
+            this_output += strconv.Itoa(game.AnnouncementStates[0].Inning) + " [" + weatherIcons[game.AnnouncementStates[0].Weather] + " " + weatherNames[game.AnnouncementStates[0].Weather] + "]" + "\n"
             this_output += teams[game.Away].Icon + " **" + teams[game.Away].Name + "** (" + strconv.Itoa(game.AnnouncementStates[0].RunsAway) + ")\n\n"
             this_output += "🏏 " + game.AnnouncementStates[0].Batter.Name + "\n"
             this_output += "⚾ " + game.AnnouncementStates[0].Pitcher.Name + "\n\n"
@@ -842,6 +900,75 @@ func HandlePlays (session *discordgo.Session, message string, start int, end int
         CheckError(err)
         // fmt.Println(output)
     }
+}
+
+func DoWeather(bat *Team, pitch *Team, w string, batter int) []string {
+    var output []string
+    switch w {
+    case "ash":
+        if rand.Float64() < 0.009 {
+            if players[pitch.Rotation[pitch.CurrentPitcher]].Modifiers["ash_twin"] == 0 {
+                players[pitch.Rotation[pitch.CurrentPitcher]].Modifiers["ash_twin"] = 2
+            }
+            output = append(output, players[pitch.Rotation[pitch.CurrentPitcher]].Name + " is covered in ashes. They are an Ash Twin!")
+        }
+        if rand.Float64() < 0.009 {
+            if players[bat.Lineup[batter]].Modifiers["ember_twin"] > 0 {
+                for i, j := range pitch.Lineup {
+                    if _, ok := players[j].Modifiers["ash_twin"]; ok && rand.Float64() < 0.7 {
+                        players[bat.Lineup[batter]].Modifiers["ember_twin"] = 0
+                        players[bat.Lineup[batter]].Modifiers["ash_twin"] = -1
+                        players[pitch.Lineup[i]].Modifiers["ash_twin"] = 0
+                        output = append(output, players[bat.Lineup[batter]].Name + " is caught up in the ashes. They pair with " + players[pitch.Lineup[i]].Name + "!")
+                        output = append(output, players[pitch.Lineup[i]].Name + " steps up to bat.")
+                        FeedbackPlayers(&bat.Lineup[batter], &pitch.Lineup[i])
+                        break
+                    }
+                }
+            }
+        }
+    case "ember":
+        if rand.Float64() < 0.01 {
+            if players[bat.Lineup[batter]].Modifiers["ember"] == 0 {
+                players[bat.Lineup[batter]].Modifiers["ember"] = 3
+            }
+            output = append(output, players[bat.Lineup[batter]].Name + " is caught up in the embers. They are an Ember Twin!")
+        } else if rand.Float64() < 0.0001 {
+            if rand.Float64() < 0.5 {
+                output = append(output, players[bat.Lineup[batter]].Name + " is caught up in the embers. They are incinerated!")
+                Incinerate(&bat.Lineup[batter])
+                output = append(output, "An umpire throws a body on home base.")
+                output = append(output, players[bat.Lineup[batter]].Name + " steps up to bat!")
+            } else {
+                output = append(output, players[pitch.Rotation[pitch.CurrentPitcher]].Name + " is caught up in the embers. They are incinerated!")
+                Incinerate(&pitch.Rotation[pitch.CurrentPitcher])
+                output = append(output, "An umpire throws a body on the mound.")
+                output = append(output, players[pitch.Rotation[pitch.CurrentPitcher]].Name + " is now pitching!")
+            }
+        }
+    case "feedback":
+        if rand.Float64() < 0.003 {
+            FeedbackPlayers(&pitch.Rotation[pitch.CurrentPitcher], &bat.Lineup[batter])
+            if rand.Float64() < 0.5 {
+                output = append(output, players[pitch.Rotation[pitch.CurrentPitcher]].Name + " receives feedback.")
+                output = append(output, players[bat.Lineup[batter]].Name + " is now a batter for the " + bat.Name + "!")
+            } else {
+                output = append(output, players[bat.Lineup[batter]].Name + " receives feedback.")
+                output = append(output, players[pitch.Rotation[pitch.CurrentPitcher]].Name + " is now a pitcher for the " + pitch.Name + "!")
+            }
+        }
+    }
+
+    return output
+}
+
+func FeedbackPlayers(pointA *string, pointB *string) {
+    *pointA, *pointB = *pointB, *pointA
+}
+
+func Incinerate(player *string) {
+    newPlayer := NewPlayer(players[*player].Team)
+    *player = newPlayer
 }
 
 func ShowInCircles(n int, m int) string {
@@ -944,8 +1071,9 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                 cont := strings.ToLower(m.Content[3:len(m.Content)])
                 split := strings.Split(cont, ">")
                 for i := range split {
-                    FixUnnecesarySpaces(split[i])
+                    split[i] = FixUnnecesarySpaces(split[i])
                 }
+                fmt.Println(cont)
                 // Fan inserted more than three args on command
                 if len(split) > 3 {
                     s.ChannelMessageSend(m.ChannelID, "Expected less than 3 arguments, got " + strconv.Itoa(len(split)))
@@ -1005,7 +1133,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                 }
             } else if strings.HasPrefix(m.Content, "&f ") { // Favoriting teams
                 cont := strings.ToLower(m.Content[3:len(m.Content)])
-                FixUnnecesarySpaces(cont)
+                cont = FixUnnecesarySpaces(cont)
                 if CheckForShopItem(m.Author.ID, "flute", 1) > 0 {
                     for i := range teams {
                         team := teams[i]
@@ -1016,6 +1144,16 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                             AddField(emb, teams[i].Icon + " " + teams[i].Name, teams[i].Description, false)
                             s.ChannelMessageSendEmbed(m.ChannelID, emb)
                         }
+                    }
+                }
+            } else if strings.HasPrefix(m.Content, "&m ") { // Favoriting teams
+                cont := strings.ToLower(m.Content[3:len(m.Content)])
+                cont = FixUnnecesarySpaces(cont)
+                text := ""
+                for _, i := range mods {
+                    if strings.ToLower(modNames[i]) == cont || modIcons[i] == cont {
+                        text += "**" + modIcons[i] + " " + modNames[i] + "**\n"
+                        text += modDescs[i]
                     }
                 }
             } else if strings.HasPrefix(m.Content, "&be ") { // Shop
@@ -1282,6 +1420,28 @@ func AddField (embed *discordgo.MessageEmbed, name string, value string, inline 
     new_field.Value = value
     new_field.Inline = inline
     embed.Fields = append(embed.Fields, new_field)
+}
+
+func updateDatabases() {
+    for k := range teams {
+        team := teams[k]
+        command := `INSERT INTO teams VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (uuid) DO UPDATE SET modifiers = excluded.modifiers, lineup = excluded.lineup, rotation = excluded.rotation, current_pitcher = excluded.current_pitcher`
+        _, err := db.Exec(command, team.UUID, strings.Replace(team.Name, "'", "''", -1), strings.Replace(team.Description, "'", "''", -1), team.Icon, SliceString(team.Lineup), SliceString(team.Rotation), MapString(team.Modifiers), team.AvgDef, team.CurrentPitcher)
+        fmt.Println(MapString(team.Modifiers))
+        CheckError(err)
+    }
+    for k := range players {
+        player := players[k]
+        command := `INSERT INTO players VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ON CONFLICT (uuid) DO UPDATE SET name = excluded.name, modifiers = excluded.modifiers`
+        _, err := db.Exec(command, player.UUID, strings.Replace(player.Name, "'", "''", -1), strings.Replace(player.Team, "'", "''", -1), player.Batting, player.Pitching, player.Defense, player.Blaserunning, MapString(player.Modifiers), player.Blood, player.Rh, player.Drink, player.Food, player.Ritual)
+        CheckError(err)
+    }
+    for k := range fans {
+        fan := fans[k]
+        command := `INSERT INTO fans VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO UPDATE SET favorite_team = excluded.favorite_team, coins = excluded.coins, votes = excluded.votes, shop = excluded.shop, stan = excluded.stan`
+        _, err := db.Exec(command, fan.Id, fan.Team, fan.Coins, fan.Votes, SliceString(fan.Shop), fan.Stan)
+        CheckError(err)
+    }
 }
 
 /* IN CASE THE DATABASE IS RESET
