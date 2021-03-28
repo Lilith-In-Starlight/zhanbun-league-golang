@@ -549,7 +549,7 @@ func main(){
 
 
     // Open the goroutine that handles upcoming and current games
-    go HandleGames(discord)
+    go HandleGames(discord, db)
     time.Sleep(0)
 
     // Wait here until CTRL-C or other term signal is received.
@@ -564,7 +564,7 @@ func main(){
     discord.Close()
 }
 
-func HandleGames(session *discordgo.Session) {
+func HandleGames(session *discordgo.Session, db *DB) {
     for true {
         // If there's upcoming games, but no games are currently being played
         if len(upcoming) > 0 && len(games) == 0 {
@@ -621,6 +621,7 @@ func HandleGames(session *discordgo.Session) {
             }
             if allEnded {
                 games = make([]*Game, 0)
+                updateDatabases(db)
             }
 
             time.Sleep(1 * time.Second + 500 * time.Millisecond)
@@ -1422,7 +1423,7 @@ func AddField (embed *discordgo.MessageEmbed, name string, value string, inline 
     embed.Fields = append(embed.Fields, new_field)
 }
 
-func updateDatabases() {
+func updateDatabases(db *DB) {
     for k := range teams {
         team := teams[k]
         command := `INSERT INTO teams VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (uuid) DO UPDATE SET modifiers = excluded.modifiers, lineup = excluded.lineup, rotation = excluded.rotation, current_pitcher = excluded.current_pitcher`
