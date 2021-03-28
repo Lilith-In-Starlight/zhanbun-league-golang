@@ -574,6 +574,17 @@ func HandleGames(session *discordgo.Session) {
             } else if len(games) > 0 {
                 HandlePlays(session, CurrentGamesId, 0, len(games))
             }
+
+            allEnded := true
+            for _, j := range games {
+                if !j.gameEnded {
+                    allEnded = false
+                }
+            }
+            if allEnded {
+                games = make([]*Game, 0)
+            }
+
             time.Sleep(1 * time.Second + 500 * time.Millisecond)
         }
 
@@ -829,6 +840,7 @@ func HandlePlays (session *discordgo.Session, message string, start int, end int
     if output != "" {
         _, err := session.ChannelMessageEdit(GamesChannelId, message, output)
         CheckError(err)
+        // fmt.Println(output)
     }
 }
 
