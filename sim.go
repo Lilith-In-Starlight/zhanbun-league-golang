@@ -428,6 +428,9 @@ func main(){
         var batting, pitching, defense, blaserunning float32
         err := rows.Scan(&uuid, &name, &team, &batting, &pitching, &defense, &blaserunning, &modifiers, &blood, &rh, &drink, &food, &ritual)
         CheckError(err)
+        for strings.Contains(name, "''") {
+            name = strings.Replace(name, "''", "'", -1)
+        }
         modifieds := StringMap(modifiers)
         if name == "Normal Cowboy" {
             modifieds["still_alive"] = -1
@@ -1427,14 +1430,17 @@ func updateDatabases(db *sql.DB) {
     for k := range teams {
         team := teams[k]
         command := `INSERT INTO teams VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (uuid) DO UPDATE SET modifiers = excluded.modifiers, lineup = excluded.lineup, rotation = excluded.rotation, current_pitcher = excluded.current_pitcher`
-        _, err := db.Exec(command, team.UUID, strings.Replace(team.Name, "'", "''", -1), strings.Replace(team.Description, "'", "''", -1), team.Icon, SliceString(team.Lineup), SliceString(team.Rotation), MapString(team.Modifiers), team.AvgDef, team.CurrentPitcher)
+        _, err := db.Exec(command, team.UUID, strings.Replace(team.Name, "''", "'", -1), strings.Replace(team.Description, "''", "'", -1), team.Icon, SliceString(team.Lineup), SliceString(team.Rotation), MapString(team.Modifiers), team.AvgDef, team.CurrentPitcher)
         fmt.Println(MapString(team.Modifiers))
         CheckError(err)
     }
     for k := range players {
         player := players[k]
         command := `INSERT INTO players VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ON CONFLICT (uuid) DO UPDATE SET name = excluded.name, modifiers = excluded.modifiers`
-        _, err := db.Exec(command, player.UUID, strings.Replace(player.Name, "'", "''", -1), strings.Replace(player.Team, "'", "''", -1), player.Batting, player.Pitching, player.Defense, player.Blaserunning, MapString(player.Modifiers), player.Blood, player.Rh, player.Drink, player.Food, player.Ritual)
+        for strings.Contains(player.Name, "''") {
+            player.Name = strings.Replace(player.Name, "''", "'", -1)
+        }
+        _, err := db.Exec(command, player.UUID, strings.Replace(player.Name, "''", "'", -1), strings.Replace(player.Team, "''", "'", -1), player.Batting, player.Pitching, player.Defense, player.Blaserunning, MapString(player.Modifiers), player.Blood, player.Rh, player.Drink, player.Food, player.Ritual)
         CheckError(err)
     }
     for k := range fans {
