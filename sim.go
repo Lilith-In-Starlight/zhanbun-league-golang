@@ -846,6 +846,7 @@ func HandlePlays (session *discordgo.Session, message string, start int, end int
                     }
                 }
                 output += game.LastMessage
+                output += "\n----------------\n"
             } else {
                 this_output := ""
                 this_output += "**" + teams[game.Home].Name + " at " + teams[game.Away].Name + "**" + "\n"
@@ -858,6 +859,7 @@ func HandlePlays (session *discordgo.Session, message string, start int, end int
                     this_output += teams[game.Away].Name + " wins!\n\n"
                 }
                 output += this_output
+                output += "\n------------\n"
             }
         } else {
             // fmt.Println(game.Announcements[0])
@@ -895,12 +897,12 @@ func HandlePlays (session *discordgo.Session, message string, start int, end int
             this_output += game.Announcements[0] + "\n\n"
             game.LastMessage = this_output
             output += this_output
+            output += "\n------------\n"
             game.Announcements = append(game.Announcements[:0], game.Announcements[1:]...)
             game.AnnouncementStates = append(game.AnnouncementStates[:0], game.AnnouncementStates[1:]...)
         }
     }
     if output != "" {
-        output += "\n----------------\n"
         _, err := session.ChannelMessageEdit(GamesChannelId, message, output)
         CheckError(err)
         // fmt.Println(output)
