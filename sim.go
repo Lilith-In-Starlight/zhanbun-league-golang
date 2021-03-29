@@ -987,9 +987,15 @@ func FeedbackPlayers(pointA *string, pointB *string) {
 }
 
 func Incinerate(player *string) {
-    newPlayer := NewPlayer(players[*player].Team)
-    field = append(field, *player)
-    *player = newPlayer
+    if players[*player].Modifiers["still_alive"] == 0 {
+        newPlayer := NewPlayer(players[*player].Team)
+        field = append(field, *player)
+        *player = newPlayer
+    } else {
+        field = append(field, *player)
+        players[*player].Modifiers["quantum"] = -1
+        players[*player].Modifiers["still_alive"] = -1
+    }
 }
 
 func ShowInCircles(n int, m int) string {
