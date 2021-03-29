@@ -151,6 +151,8 @@ var weatherIcons map[string]string = map[string]string{
     "feedback" : "🎙️",
 }
 
+var field []string
+
 /* The modifiers, the lineup and the rotation are all stored in json format. */
 
 var discord discordgo.Session // Variable for the bots session
@@ -355,6 +357,9 @@ func main(){
     _, err = db.Exec(`CREATE TABLE IF NOT EXISTS ritual_pool(
         ritual TEXT UNIQUE
     )`)
+    _, err = db.Exec(`CREATE TABLE IF NOT EXISTS dead_people(
+        uuid TEXT PRIMARY KEY
+    )`)
 
     // Get the pools
     rows, err := db.Query(`SELECT * FROM name_pool`)
@@ -453,7 +458,16 @@ func main(){
 
     rows.Close()
 
-
+    rows, err = db.Query(`SELECT * FROM dead_people`)
+    CheckError(err)
+    for rows.Next() {
+        var get string
+        err = rows.Scan(&get)
+        CheckError(err)
+        get = strings.Replace(get, "\r", "", -1)
+        dead_people = append(dead_people, get)
+    }
+    rows.Close()
 
     // This was used to generate the leagues. Only use it if the database is reset
     /*i := 0
@@ -974,6 +988,7 @@ func FeedbackPlayers(pointA *string, pointB *string) {
 
 func Incinerate(player *string) {
     newPlayer := NewPlayer(players[*player].Team)
+    field = append(field, *player)
     *player = newPlayer
 }
 
@@ -1449,6 +1464,12 @@ func updateDatabases(db *sql.DB) {
         fan := fans[k]
         command := `INSERT INTO fans VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO UPDATE SET favorite_team = excluded.favorite_team, coins = excluded.coins, votes = excluded.votes, shop = excluded.shop, stan = excluded.stan`
         _, err := db.Exec(command, fan.Id, fan.Team, fan.Coins, fan.Votes, MapString(fan.Shop), fan.Stan)
+        CheckError(err)
+    }
+    for k := range field {
+        player := field[k]
+        command := `INSERT INTO fans VALUES ($1) ON CONFLICT (id) DO NOTHING`
+        _, err := db.Exec(command, player)
         CheckError(err)
     }
 }
