@@ -147,7 +147,7 @@ var weatherDescs map[string]string = map[string]string {
 }
 var weatherIcons map[string]string = map[string]string{
     "ash" : "🌫️",
-    "ember" : "🐱",
+    "ember" : "💫",
     "feedback" : "🎙️",
 }
 
@@ -900,6 +900,7 @@ func HandlePlays (session *discordgo.Session, message string, start int, end int
         }
     }
     if output != "" {
+        output += "\n----------------\n"
         _, err := session.ChannelMessageEdit(GamesChannelId, message, output)
         CheckError(err)
         // fmt.Println(output)
@@ -962,7 +963,6 @@ func DoWeather(bat *Team, pitch *Team, w string, batter int) []string {
             }
         }
     }
-
     return output
 }
 
