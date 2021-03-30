@@ -136,7 +136,7 @@ var modIcons map[string]string = map[string]string{
     "quantum" : "⚛️",
 }
 
-var weathers []string = []string{"ash", "ember", "feedback"}
+var weathers []string = []string{"ash", "ember", "ember", "ember", "ember", "ember", "ember", "ember", "ember", "ember", "ember", "ember", "ember", "ember", "ember", "feedback"}
 
 var weatherNames map[string]string = map[string]string {
     "ash" : "Ashes",
@@ -793,7 +793,9 @@ func HandlePlays (session *discordgo.Session, message string, start int, end int
                                 }
                                 game.AnnouncementStates = append(game.AnnouncementStates, *game)
                             }
-                            game.ChangeBatter = true
+                            if game.Batter.Modifiers["quantum"] == 0 || rand.Float64() < 0.5 {
+                                game.ChangeBatter = true
+                            }
 
                         // The game.Batter fails to bat
                         } else {
@@ -957,8 +959,8 @@ func DoWeather(bat *Team, pitch *Team, w string, batter int) []string {
                 players[bat.Lineup[batter]].Modifiers["ember"] = 3
             }
             output = append(output, players[bat.Lineup[batter]].Name + " is caught up in the embers. They are an Ember Twin!")
-        } else if rand.Float64() < 1 { //0.0001
-            if rand.Float64() < 1 {
+        } else if rand.Float64() < 0.0001 {
+            if rand.Float64() < 0.5 {
                 output = append(output, players[bat.Lineup[batter]].Name + " is caught up in the embers. They are incinerated!")
                 Incinerate(&bat.Lineup[batter])
                 output = append(output, "An umpire throws a body on home base.")
@@ -990,7 +992,7 @@ func FeedbackPlayers(pointA *string, pointB *string) {
 }
 
 func Incinerate(player *string) {
-    if players[*player].Modifiers["still_alive"] == 0 {
+    if players[*player].Modifiers["still_alive"] == 0{
         newPlayer := NewPlayer(players[*player].Team)
         field = append(field, *player)
         *player = newPlayer
@@ -1019,9 +1021,7 @@ func Advance(bases *[3]string, homeBase string, from int) int{
         if bases[0] != "" {
             runsScored += Advance(bases, homeBase, 0)
         }
-        if players[homeBase].Modifiers["quantum"] == 0 && rand.Float64() < 0.5 {
-            bases[0] = homeBase
-        }
+        bases[0] = homeBase
     } else {
         if from + 1 <= 2 {
             if bases[from + 1] != "" {
@@ -1356,8 +1356,10 @@ func CheckForShopItem (id string, item string, retval int) int {
 // Returns the emojis of a player's modifications
 func GetModEmojis(player Player) string{
     output := ""
-    for i := range player.Modifiers {
-        output += modIcons[i]
+    for i, j := range player.Modifiers {
+        if j != 0 {
+            output += modIcons[i]
+        }
     }
     return output
 }
@@ -1365,8 +1367,10 @@ func GetModEmojis(player Player) string{
 // Returns [EMOJI mod_name] of a player's modifications
 func GetModEmojisAndNames(player Player) string{
     output := ""
-    for i := range player.Modifiers {
-        output += "[ " + modIcons[i] + " " + modNames[i] + " ]"
+    for i, j := range player.Modifiers {
+        if j != 0 {
+            output += "[ " + modIcons[i] + " " + modNames[i] + " ]"
+        }
     }
     if output == "" {
         output = "[ 🍦 Vanilla ]" // No modifiers
