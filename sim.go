@@ -119,18 +119,21 @@ var modNames map[string]string = map[string]string {
     "ember_twin" : "Ember Twin",
     "still_alive" : "Still Alive",
     "haunted" : "Haunted",
+    "quantum" : "Quantum",
 }
 var modDescs map[string]string = map[string]string {
     "ash_twin" : "This player is an Ash Twin.",
     "ember_twin" : "This player might be paired with an Ash Twin.",
     "still_alive" : "When this player's dying they'll be Still Alive.",
-    "haunted" : "This players sees players who aren't there.",
+    "haunted" : "This player sees players who aren't there.",
+    "quantum" : "This player can be in multiple states at the same time.",
 }
 var modIcons map[string]string = map[string]string{
     "ash_twin" : "🌫️",
     "ember_twin" : "💫",
     "still_alive" : "🐱",
     "haunted" : "👥",
+    "quantum" : "⚛️",
 }
 
 var weathers []string = []string{"ash", "ember", "feedback"}
@@ -358,7 +361,7 @@ func main(){
         ritual TEXT UNIQUE
     )`)
     _, err = db.Exec(`CREATE TABLE IF NOT EXISTS dead_people(
-        uuid TEXT PRIMARY KEY
+        uuid TEXT
     )`)
 
     // Get the pools
@@ -1016,7 +1019,9 @@ func Advance(bases *[3]string, homeBase string, from int) int{
         if bases[0] != "" {
             runsScored += Advance(bases, homeBase, 0)
         }
-        bases[0] = homeBase
+        if players[homeBase].Modifiers["quantum"] == 0 && rand.Float64() < 0.5 {
+            bases[0] = homeBase
+        }
     } else {
         if from + 1 <= 2 {
             if bases[from + 1] != "" {
