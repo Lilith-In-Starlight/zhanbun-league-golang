@@ -85,8 +85,8 @@ type Fan struct {
     Stan string
 }
 
-const CommandChannelId = "822210011882061863"
-const GamesChannelId = "822210201574703114"
+const CommandChannelId = "823421429601140756"
+const GamesChannelId = "823421360768417824"
 
 var CurrentGamesId string
 var CurrentGamesId2 string
@@ -468,7 +468,7 @@ func main(){
         err = rows.Scan(&get)
         CheckError(err)
         get = strings.Replace(get, "\r", "", -1)
-        dead_people = append(dead_people, get)
+        field = append(field, get)
     }
     rows.Close()
 
@@ -641,7 +641,7 @@ func HandleGames(session *discordgo.Session, db *sql.DB) {
             }
             if allEnded {
                 games = make([]*Game, 0)
-                updateDatabases(db)
+                // updateDatabases(db)
             }
 
             time.Sleep(1 * time.Second + 500 * time.Millisecond)
@@ -957,8 +957,8 @@ func DoWeather(bat *Team, pitch *Team, w string, batter int) []string {
                 players[bat.Lineup[batter]].Modifiers["ember"] = 3
             }
             output = append(output, players[bat.Lineup[batter]].Name + " is caught up in the embers. They are an Ember Twin!")
-        } else if rand.Float64() < 0.0001 {
-            if rand.Float64() < 0.5 {
+        } else if rand.Float64() < 1 { //0.0001
+            if rand.Float64() < 1 {
                 output = append(output, players[bat.Lineup[batter]].Name + " is caught up in the embers. They are incinerated!")
                 Incinerate(&bat.Lineup[batter])
                 output = append(output, "An umpire throws a body on home base.")
