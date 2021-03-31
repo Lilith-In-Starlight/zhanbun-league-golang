@@ -136,7 +136,7 @@ var modIcons map[string]string = map[string]string{
     "quantum" : "⚛️",
 }
 
-var weathers []string = []string{"ash", "ember", "ember", "ember", "ember", "ember", "ember", "ember", "ember", "ember", "ember", "ember", "ember", "ember", "ember", "feedback"}
+var weathers []string = []string{"ash", "ember", "feedback"}
 
 var weatherNames map[string]string = map[string]string {
     "ash" : "Ashes",
@@ -456,6 +456,11 @@ func main(){
         err := rows.Scan(&uuid, &name, &description, &icon, &lineup, &rotation, &modifiers, &AvgDef, &currentPitcher)
         modi := StringMap(modifiers)
         CheckError(err)
+        if name == "Otherside Eggs" {
+            icon = "🥚"
+        } else if name == "Thaumic Paracelsii" {
+            icon = "⚗️"
+        }
         TeamWithData(name, description, icon, uuid, StringSlice(lineup), StringSlice(rotation), modi, AvgDef, currentPitcher)
     }
 
