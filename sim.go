@@ -1394,7 +1394,10 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                 }
             } else if strings.HasPrefix(m.Content, "&e ") { // Shop
                 cont := strings.ToLower(m.Content[3:len(m.Content)])
-                CreateFanIfNotExist()
+                CreateFanIfNotExist(m.Author.ID)
+                if fans[m.Author.ID].favorite_team == "" {
+                    return
+                }
                 split := strings.Split(cont, ">")
                 // This gets rid of final, initial and double spaces
                 // Makes commands easier to type
