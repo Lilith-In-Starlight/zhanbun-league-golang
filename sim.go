@@ -650,14 +650,11 @@ func HandleGames(session *discordgo.Session, db *sql.DB) {
 
         }
         if len(upcoming) == 0 { // If there are no upcoming games
-            i := 0
             if tape == 0 || tape >= 10 {
                 tape = 1
             }
-            var TeamA string
-            var TeamB string
             var touched = [10]int{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1}
-            for k := range teams {
+            for i := 0; i<10;i++ {
                 j := i + tape
                 if j >= 10 {
                     j -= 10
@@ -665,7 +662,6 @@ func HandleGames(session *discordgo.Session, db *sql.DB) {
                 if touched[i] == -1 && touched[j] == -1 {
                     NewGame(fun_league[i], cool_league[j], 9)
                 }
-                i += 1
             }
             time.Sleep(10 * time.Second)
         }
