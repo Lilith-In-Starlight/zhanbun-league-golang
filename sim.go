@@ -351,17 +351,17 @@ func main(){
         coins INTEGER,
         votes INTEGER,
         shop TEXT,
-        stan TEXT,
+        stan TEXT
     )`)
     _, err = db.Exec(`CREATE TABLE IF NOT EXISTS seasons(
-        number INTEGER PRIMARY KEY
-        day INTEGER
-        tape INTEGER
-        election TEXT
-        wins TEXT
-        losses TEXT
-        b1 TEXT
-        b2 TEXT
+        number INTEGER PRIMARY KEY,
+        day INTEGER,
+        tape INTEGER,
+        election TEXT,
+        wins TEXT,
+        losses TEXT,
+        b1 TEXT,
+        b2 TEXT,
         b3 TEXT
     )`)
 
