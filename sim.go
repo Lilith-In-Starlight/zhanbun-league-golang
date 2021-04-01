@@ -1646,7 +1646,7 @@ func updateDatabases(db *sql.DB) {
         player := field[k]
         command := `INSERT INTO fans VALUES ($1) ON CONFLICT (id) DO NOTHING`
         _, err := db.Exec(command, player)
-        CheckErrob
+        CheckError(err)
     }
     command := `INSERT INTO seasons VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (id) DO UPDATE SET seasons day = excluded.day, tape = excluded.tape, election = excluded.election, wins = excluded.wins, losses = excluded.losses, b1 = excluded.b1, b2 = excluded.b2, b3 = excluded.b3`
     _, err := db.Exec(command, seasonNumber, day, tape, MapString(election), MapString(wins), MapString(losses), MapString(bless1), MapString(bless2), MapString(bless3))
