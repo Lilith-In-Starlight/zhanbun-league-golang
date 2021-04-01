@@ -507,7 +507,7 @@ func main(){
     }
     rows.Close()
 
-    rows, err = db.Query(`SELECT * FROM season`)
+    rows, err = db.Query(`SELECT * FROM seasons`)
     CheckError(err)
     for rows.Next() {
         var s, d, t int
