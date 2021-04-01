@@ -119,10 +119,10 @@ var losses map[string]int
 
 var validuuids []string
 
-var election map[strings]int
-var bless1 map[strings]int
-var bless2 map[strings]int
-var bless3 map[strings]int
+var election map[string]int
+var bless1 map[string]int
+var bless2 map[string]int
+var bless3 map[string]int
 
 
 var mods []string = []string{"ash_twin", "ember_twin", "still_alive", "haunted"}
@@ -296,9 +296,12 @@ func main(){
     players = make(map[string]*Player)
     teams = make(map[string]*Team)
     fans = make(map[string]*Fan)
-    wins = make(map[string]*Fan)
-    losses = make(map[string]*Fan)
-    election = make(map[string]*Fan)
+    wins = make(map[string]int)
+    losses = make(map[string]int)
+    election = make(map[string]int)
+    bless1 = make(map[string]int)
+    bless2 = make(map[string]int)
+    bless3 = make(map[string]int)
     // Make sure the RNG is random
     rand.Seed(time.Now().Unix())
     // Load the .env file, this has to be discarded for heroku releases
@@ -511,8 +514,7 @@ func main(){
         var e, l, w, b1, b2, b3 string
         err = rows.Scan(&s, &d, &t, &e, &w, &l, &b1, &b2, &b3)
         CheckError(err)
-        day, tape, election, losses, wins, bless1, bless2, bless3 = d, t, StringMap(e), l, w, StringMap(b1), StringMap(b2), StringMap(b3)
-        field = append(field, get)
+        day, tape, election, losses, wins, bless1, bless2, bless3 = d, t, StringMap(e), StringMap(l), StringMap(w), StringMap(b1), StringMap(b2), StringMap(b3)
     }
     rows.Close()
 
@@ -1395,7 +1397,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
             } else if strings.HasPrefix(m.Content, "&e ") { // Shop
                 cont := strings.ToLower(m.Content[3:len(m.Content)])
                 CreateFanIfNotExist(m.Author.ID)
-                if fans[m.Author.ID].favorite_team == "" {
+                if fans[m.Author.ID].Team == "" {
                     return
                 }
                 split := strings.Split(cont, ">")
@@ -1439,7 +1441,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                         case "✨":
                             if fans[m.Author.ID].Votes >= amount {
                                 fans[m.Author.ID].Votes -= amount
-                                bless1[fans[m.Author.ID].favorite_team] = bless1[fans[m.Author.ID].favorite_team] + 1
+                                bless1[fans[m.Author.ID].Team] = bless1[fans[m.Author.ID].Team] + 1
                                 s.ChannelMessageSend(m.ChannelID, "Voted!")
                             } else {
                                 s.ChannelMessageSend(m.ChannelID, "Not enough votes.")
@@ -1447,7 +1449,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                         case "⚛️":
                             if fans[m.Author.ID].Votes >= amount {
                                 fans[m.Author.ID].Votes -= amount
-                                bless2[fans[m.Author.ID].favorite_team] = bless2[fans[m.Author.ID].favorite_team] + 1
+                                bless2[fans[m.Author.ID].Team] = bless2[fans[m.Author.ID].Team] + 1
                                 s.ChannelMessageSend(m.ChannelID, "Voted!")
                             } else {
                                 s.ChannelMessageSend(m.ChannelID, "Not enough votes.")
@@ -1455,7 +1457,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                         case "💤":
                             if fans[m.Author.ID].Votes >= amount {
                                 fans[m.Author.ID].Votes -= amount
-                                bless3[fans[m.Author.ID].favorite_team] = bless3[fans[m.Author.ID].favorite_team] + 1
+                                bless3[fans[m.Author.ID].Team] = bless3[fans[m.Author.ID].Team] + 1
                                 s.ChannelMessageSend(m.ChannelID, "Voted!")
                             } else {
                                 s.ChannelMessageSend(m.ChannelID, "Not enough votes.")
