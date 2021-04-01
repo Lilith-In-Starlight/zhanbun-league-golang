@@ -85,6 +85,11 @@ type Fan struct {
     Stan string
 }
 
+const seasonNumber = 1
+
+var day int := 1
+var tape int := 1
+
 const CommandChannelId = "822210011882061863"
 const GamesChannelId = "822210201574703114"
 
@@ -109,7 +114,15 @@ var ritual_pool []string
 var upcoming []*Game
 var games []*Game
 
+var wins map[string]int
+var losses map[string]int
+
 var validuuids []string
+
+var election map[strings]int
+var bless1 map[strings]int
+var bless2 map[strings]int
+var bless3 map[strings]int
 
 
 var mods []string = []string{"ash_twin", "ember_twin", "still_alive", "haunted"}
@@ -283,6 +296,9 @@ func main(){
     players = make(map[string]*Player)
     teams = make(map[string]*Team)
     fans = make(map[string]*Fan)
+    wins = make(map[string]*Fan)
+    losses = make(map[string]*Fan)
+    election = make(map[string]*Fan)
     // Make sure the RNG is random
     rand.Seed(time.Now().Unix())
     // Load the .env file, this has to be discarded for heroku releases
@@ -333,6 +349,17 @@ func main(){
         votes INTEGER,
         shop TEXT,
         stan TEXT,
+    )`)
+    _, err = db.Exec(`CREATE TABLE IF NOT EXISTS seasons(
+        number INTEGER PRIMARY KEY
+        day INTEGER
+        tape INTEGER
+        election TEXT
+        wins TEXT
+        losses TEXT
+        b1 TEXT
+        b2 TEXT
+        b3 TEXT
     )`)
 
     // Setup the pools
@@ -477,6 +504,18 @@ func main(){
     }
     rows.Close()
 
+    rows, err = db.Query(`SELECT * FROM season`)
+    CheckError(err)
+    for rows.Next() {
+        var s, d, t int
+        var e, l, w, b1, b2, b3 string
+        err = rows.Scan(&s, &d, &t, &e, &w, &l, &b1, &b2, &b3)
+        CheckError(err)
+        day, tape, election, losses, wins, bless1, bless2, bless3 = d, t, StringMap(e), l, w, StringMap(b1), StringMap(b2), StringMap(b3)
+        field = append(field, get)
+    }
+    rows.Close()
+
     // This was used to generate the leagues. Only use it if the database is reset
     /*i := 0
     j := 0
@@ -610,14 +649,19 @@ func HandleGames(session *discordgo.Session, db *sql.DB) {
         }
         if len(upcoming) == 0 { // If there are no upcoming games
             i := 0
+            if tape == 0 || tape >= 10 {
+                tape = 1
+            }
             var TeamA string
             var TeamB string
+            var touched = [10]int{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1}
             for k := range teams {
-                if i % 2 == 0 {
-                    TeamA = string(k)
-                } else {
-                    TeamB = string(k)
-                    NewGame(TeamA, TeamB, 9)
+                j := i + tape
+                if j >= 10 {
+                    j -= 10
+                }
+                if touched[i] == -1 && touched[j] == -1 {
+                    NewGame(fun_league[i], cool_league[j], 9)
                 }
                 i += 1
             }
@@ -646,7 +690,13 @@ func HandleGames(session *discordgo.Session, db *sql.DB) {
             }
             if allEnded {
                 games = make([]*Game, 0)
-                // updateDatabases(db)
+                day += 1
+                if day < 91 && day % 2 == 0 {
+                    tape += 1
+                } else if day >= 91 {
+                    tape += 1
+                }
+                updateDatabases(db)
             }
 
             time.Sleep(1 * time.Second + 500 * time.Millisecond)
@@ -849,10 +899,14 @@ func HandlePlays (session *discordgo.Session, message string, start int, end int
                                     // TODO give money to the players that bet
                                     // TODO send "game ended" message
                                     if game.RunsAway > game.RunsHome {
+                                        wins[game.Away] = wins[game.Away] + 1
+                                        losses[game.Home] = losses[game.Home] + 1
                                         for i, j := range game.betsAway {
                                             fans[i].Coins += j * 2 + rand.Intn(7) - 1
                                         }
                                     } else {
+                                        wins[game.Home] = wins[game.Home] + 1
+                                        losses[game.Away] = losses[game.Away] + 1
                                         for i, j := range game.betsHome {
                                             fans[i].Coins += j * 2 + rand.Intn(7) - 1
                                         }
@@ -1057,6 +1111,9 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
             AddField(emb, "&st", "Shows a list of all teams.", false)
             AddField(emb, "&u", "Shows all the upcoming games.", false)
             AddField(emb, "&s", "Searches for a team or a player. &st [team name | icon] > (player name)", false)
+            AddField(emb, "&b", "Shows you the store and lets you buy things. &b ([icon] > [amount to buy])", false)
+            AddField(emb, "&f", "Lets you select your favorite team. &f [icon]. Requires Fairweather Flutes.", false)
+            AddField(emb, "&e", "Participate in the election. &e ([icon] > [amount of votes])", false)
             /*emb.AddField("&help", "Sends this list of commands.")
             emb.AddField("&st", "Shows a list of all teams.")*/
             s.ChannelMessageSendEmbed(m.ChannelID, emb)
@@ -1101,8 +1158,23 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
            emb.Color = 8651301
            AddField(emb, "🐍 Snake Oil (" + strconv.Itoa(calculateGrowingPrice(fans[m.Author.ID].Shop["snoil"], 15, 1.8)) + ")", "Increase the maximum amount of money you can bet. It'd go from " + strconv.Itoa(calculateGrowingPrice(fans[m.Author.ID].Shop["snoil"], 10, 1.5)) +" to " + strconv.Itoa(calculateGrowingPrice(fans[m.Author.ID].Shop["snoil"] + 1, 10, 1.5)) + ".", false)
            AddField(emb, "🎟️ Vote (100)", "Participate in Democracy.", false)
+           AddField(emb, "🥂 Fairweather Flute (2000)", "Change your favorite team. Your previous team will be a little sad, but they'll understand.", false)
+           AddField(emb, "🐍 Snake Oil (" + strconv.Itoa(calculateGrowingPrice(fans[m.Author.ID].Shop["snoil"], 15, 1.8)) + ")", "Increase the maximum amount of money you can bet. It'd go from " + strconv.Itoa(calculateGrowingPrice(fans[m.Author.ID].Shop["snoil"], 10, 1.5)) +" to " + strconv.Itoa(calculateGrowingPrice(fans[m.Author.ID].Shop["snoil"] + 1, 10, 1.5)) + ".", false)
            AddField(emb, "🥺 Beg (FREE)", "Uses alchemy to convert your brokeness into a few coins.", false)
            s.ChannelMessageSendEmbed(m.ChannelID, emb)
+       case "&e":
+          emb := new(discordgo.MessageEmbed)
+          CheckForShopItem(m.Author.ID, "snoil", 0)
+          emb.Title = "The Election" + " (" + strconv.Itoa(fans[m.Author.ID].Votes) + ")"
+          emb.Color = 8651301
+          AddField(emb, "DECREES", "Decrees are permanent modifications to the rules of Blaseball.", false)
+          AddField(emb, "👂 Communication", "Let's talk.", false)
+          AddField(emb, "☎️ Discourse", "Let's listen.", false)
+          AddField(emb, "BLESSINGS", "Blessings are modifications to teams.", false)
+          AddField(emb, "✨ Magic", "Magic learn to do Magic Damage.", false)
+          AddField(emb, "⚛️ Quantum Mechanics", "Quantum teams are affected by macroscopic quantum phenomena.", false)
+          AddField(emb, "💤 Lullaby", "Lullaby teams learn to sing a lullaby.", false)
+          s.ChannelMessageSendEmbed(m.ChannelID, emb)
         default:
             if strings.HasPrefix(m.Content, "&s ") {
                 cont := strings.ToLower(m.Content[3:len(m.Content)])
@@ -1182,6 +1254,8 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                             s.ChannelMessageSendEmbed(m.ChannelID, emb)
                         }
                     }
+                } else {
+                    s.ChannelMessageSend(m.ChannelID, "Not enough flutes!")
                 }
             } else if strings.HasPrefix(m.Content, "&m ") { // Favoriting teams
                 cont := strings.ToLower(m.Content[3:len(m.Content)])
@@ -1299,12 +1373,89 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                             } else {
                                 s.ChannelMessageSend(m.ChannelID, "Not enough coins.")
                             }
+                        case "🥂":
+                            CheckForShopItem(m.Author.ID, "flute", 1)
+                            if fans[m.Author.ID].Coins > 2000 * amount {
+                                fans[m.Author.ID].Shop["flute"] += amount
+                                fans[m.Author.ID].Coins -= 2000 * amount
+                                s.ChannelMessageSend(m.ChannelID, "Bought " + strconv.Itoa(amount) + " flutes for " + strconv.Itoa(2000 * amount) + " coins.")
+                            } else {
+                                s.ChannelMessageSend(m.ChannelID, "Not enough coins.")
+                            }
                         case "🥺":
                             if fans[m.Author.ID].Coins <= 0 {
                                 fans[m.Author.ID].Coins = rand.Intn(12)
                                 s.ChannelMessageSend(m.ChannelID, "Conversion has succeeded! " + strconv.Itoa(fans[m.Author.ID].Coins) + " coins appear in your pockets.")
                             } else {
                                 s.ChannelMessageSend(m.ChannelID, "Not enough brokeness.")
+                            }
+                        }
+                    }
+                }
+            } else if strings.HasPrefix(m.Content, "&e ") { // Shop
+                cont := strings.ToLower(m.Content[3:len(m.Content)])
+                CreateFanIfNotExist()
+                split := strings.Split(cont, ">")
+                // This gets rid of final, initial and double spaces
+                // Makes commands easier to type
+                for i, k := range split {
+                    split[i] = FixUnnecesarySpaces(string(k))
+                }
+                if len(split) > 2 {
+                    s.ChannelMessageSend(m.ChannelID, "Expected less than 2 arguments, got " + strconv.Itoa(len(split)))
+                } else {
+                    print(split[0])
+                    if split[0] != "" {
+                        amount := 1
+                        if len(split) != 1 {
+                            amt, err := strconv.Atoi(split[1])
+                            if err != nil {
+                                s.ChannelMessageSend(m.ChannelID, "Second argument is not an integer.")
+                                return
+                            }
+                            amount = amt
+                        }
+
+                        switch split[0] {
+                        case "👂":
+                            if fans[m.Author.ID].Votes >= amount {
+                                fans[m.Author.ID].Votes -= amount
+                                election["comm"] = election["comm"] + 1
+                                s.ChannelMessageSend(m.ChannelID, "Voted!")
+                            } else {
+                                s.ChannelMessageSend(m.ChannelID, "Not enough votes.")
+                            }
+                        case "☎️":
+                            if fans[m.Author.ID].Votes >= amount {
+                                fans[m.Author.ID].Votes -= amount
+                                election["disc"] = election["disc"] + 1
+                                s.ChannelMessageSend(m.ChannelID, "Voted!")
+                            } else {
+                                s.ChannelMessageSend(m.ChannelID, "Not enough votes.")
+                            }
+                        case "✨":
+                            if fans[m.Author.ID].Votes >= amount {
+                                fans[m.Author.ID].Votes -= amount
+                                bless1[fans[m.Author.ID].favorite_team] = bless1[fans[m.Author.ID].favorite_team] + 1
+                                s.ChannelMessageSend(m.ChannelID, "Voted!")
+                            } else {
+                                s.ChannelMessageSend(m.ChannelID, "Not enough votes.")
+                            }
+                        case "⚛️":
+                            if fans[m.Author.ID].Votes >= amount {
+                                fans[m.Author.ID].Votes -= amount
+                                bless2[fans[m.Author.ID].favorite_team] = bless2[fans[m.Author.ID].favorite_team] + 1
+                                s.ChannelMessageSend(m.ChannelID, "Voted!")
+                            } else {
+                                s.ChannelMessageSend(m.ChannelID, "Not enough votes.")
+                            }
+                        case "💤":
+                            if fans[m.Author.ID].Votes >= amount {
+                                fans[m.Author.ID].Votes -= amount
+                                bless3[fans[m.Author.ID].favorite_team] = bless3[fans[m.Author.ID].favorite_team] + 1
+                                s.ChannelMessageSend(m.ChannelID, "Voted!")
+                            } else {
+                                s.ChannelMessageSend(m.ChannelID, "Not enough votes.")
                             }
                         }
                     }
@@ -1490,8 +1641,11 @@ func updateDatabases(db *sql.DB) {
         player := field[k]
         command := `INSERT INTO fans VALUES ($1) ON CONFLICT (id) DO NOTHING`
         _, err := db.Exec(command, player)
-        CheckError(err)
+        CheckErrob
     }
+    command := `INSERT INTO seasons VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (id) DO UPDATE SET seasons day = excluded.day, tape = excluded.tape, election = excluded.election, wins = excluded.wins, losses = excluded.losses, b1 = excluded.b1, b2 = excluded.b2, b3 = excluded.b3`
+    _, err := db.Exec(command, seasonNumber, day, tape, MapString(election), MapString(wins), MapString(losses), MapString(bless1), MapString(bless2), MapString(bless3))
+    CheckError(err)
 }
 
 /* IN CASE THE DATABASE IS RESET
