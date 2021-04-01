@@ -87,8 +87,8 @@ type Fan struct {
 
 const seasonNumber = 1
 
-var day int := 1
-var tape int := 1
+var day int = 1
+var tape int = 1
 
 const CommandChannelId = "822210011882061863"
 const GamesChannelId = "822210201574703114"
