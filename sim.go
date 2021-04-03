@@ -1157,7 +1157,6 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
            AddField(emb, "🐍 Snake Oil (" + strconv.Itoa(calculateGrowingPrice(fans[m.Author.ID].Shop["snoil"], 15, 1.8)) + ")", "Increase the maximum amount of money you can bet. It'd go from " + strconv.Itoa(calculateGrowingPrice(fans[m.Author.ID].Shop["snoil"], 10, 1.5)) +" to " + strconv.Itoa(calculateGrowingPrice(fans[m.Author.ID].Shop["snoil"] + 1, 10, 1.5)) + ".", false)
            AddField(emb, "🎟️ Vote (100)", "Participate in Democracy.", false)
            AddField(emb, "🥂 Fairweather Flute (2000)", "Change your favorite team. Your previous team will be a little sad, but they'll understand.", false)
-           AddField(emb, "🐍 Snake Oil (" + strconv.Itoa(calculateGrowingPrice(fans[m.Author.ID].Shop["snoil"], 15, 1.8)) + ")", "Increase the maximum amount of money you can bet. It'd go from " + strconv.Itoa(calculateGrowingPrice(fans[m.Author.ID].Shop["snoil"], 10, 1.5)) +" to " + strconv.Itoa(calculateGrowingPrice(fans[m.Author.ID].Shop["snoil"] + 1, 10, 1.5)) + ".", false)
            AddField(emb, "🥺 Beg (FREE)", "Uses alchemy to convert your brokeness into a few coins.", false)
            s.ChannelMessageSendEmbed(m.ChannelID, emb)
        case "&e":
@@ -1356,7 +1355,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                         switch split[0] {
                         case "🐍":
                             CheckForShopItem(m.Author.ID, "snoil", 0)
-                            if fans[m.Author.ID].Coins > calculateGrowingPrice(amount - 1 + fans[m.Author.ID].Shop["snoil"], 15, 1.8) {
+                            if fans[m.Author.ID].Coins >= calculateGrowingPrice(amount - 1 + fans[m.Author.ID].Shop["snoil"], 15, 1.8) {
                                 fans[m.Author.ID].Coins -= calculateGrowingPrice(amount - 1 + fans[m.Author.ID].Shop["snoil"], 15, 1.8)
                                 fans[m.Author.ID].Shop["snoil"] += amount
                                 s.ChannelMessageSend(m.ChannelID, "Bought " + strconv.Itoa(amount) + " snake oil for " + strconv.Itoa(calculateGrowingPrice(fans[m.Author.ID].Shop["snoil"]-1, 15, 1.8)) + " coins.")
@@ -1364,7 +1363,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                                 s.ChannelMessageSend(m.ChannelID, "Not enough coins.")
                             }
                         case "🎟️":
-                            if fans[m.Author.ID].Coins > 100 * amount {
+                            if fans[m.Author.ID].Coins >= 100 * amount {
                                 fans[m.Author.ID].Votes += amount
                                 fans[m.Author.ID].Coins -= 100 * amount
                                 s.ChannelMessageSend(m.ChannelID, "Bought " + strconv.Itoa(amount) + " votes for " + strconv.Itoa(100 * amount) + " coins.")
@@ -1373,7 +1372,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
                             }
                         case "🥂":
                             CheckForShopItem(m.Author.ID, "flute", 1)
-                            if fans[m.Author.ID].Coins > 2000 * amount {
+                            if fans[m.Author.ID].Coins >= 2000 * amount {
                                 fans[m.Author.ID].Shop["flute"] += amount
                                 fans[m.Author.ID].Coins -= 2000 * amount
                                 s.ChannelMessageSend(m.ChannelID, "Bought " + strconv.Itoa(amount) + " flutes for " + strconv.Itoa(2000 * amount) + " coins.")
